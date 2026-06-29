@@ -1,5 +1,4 @@
-﻿
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pl">
 <head>
     <meta charset="utf-8" />
@@ -161,6 +160,24 @@
             box-shadow: 0 1px 2px rgba(0,0,0,0.05);
             height: 400px;
         }
+
+        .d-none { display: none; }
+
+        .spinner {
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            border-top-color: #fff;
+            border-radius: 50%;
+            display: inline-block;
+            animation: spin .8s linear infinite;
+            margin-right: 6px;
+            vertical-align: middle;
+        }
+
+        @@keyframes spin {
+    100% { transform: rotate(360deg); }
+}
     </style>
 </head>
 <body>
@@ -179,8 +196,14 @@
                     <span>Czas trwania: <b id="ui_duration">00:00:00</b></span>
                 </div>
                 <div class="control-item">
+                    @* <span id="ui_valveStatus" class="valve-status">[ 230V - OFF ]</span>
+                    <button id="btn_processToggle" class="btn btn-start" onclick="toggleProcess()">START PROCESU</button> *@
                     <span id="ui_valveStatus" class="valve-status">[ 230V - OFF ]</span>
-                    <button id="btn_processToggle" class="btn btn-start" onclick="toggleProcess()">START PROCESU</button>
+                    <button id="btn_processToggle" class="btn btn-start" onclick="toggleProcess()">
+                        <span id="btn_spinner" class="spinner d-none"></span>
+                        <span id="btn_text">START PROCESU</span>
+                    </button>
+
                 </div>
             </div>
             <div class="control-row" style="justify-content: flex-start; gap: 20px;">
@@ -188,12 +211,11 @@
                     <label>Nazwa pliku danych:</label>
                     <input type="text" id="ui_filename"  value="MójProces.csv" style="background-color:#f9f9f9;" onchange="updateFileName(this.value)"/>
                 </div>
-
             </div>
             <div class="control-row" style="margin-bottom: 0;">
                 <div class="control-item" style="width: 100%;">
                     <label style="align-self: flex-start; padding-top: 8px;">Komentarz:</label>
-                    <input type="text" id="ui_comment" class="comment-box" placeholder="Wprowadź uwagi do logu..." onchange="updateComment(this.value)" />
+                    <input type="text" id="ui_comment" class="comment-box" placeholder="Wprowadź uwagi do logu..." oninput="updateComment(this.value)" />
                 </div>
             </div>
         </div>
@@ -264,149 +286,260 @@
 
         <div class="section-title">Wykres online (SignalR)</div>
         <div class="chart-container">
+            <div class="control-item" style="margin-bottom: 15px;">
+                <strong>Widoczność na wykresie:</strong>
+                <div style="display: flex; gap: 15px; flex-wrap: wrap; margin-top: 5px;">
+                    <label style="cursor: pointer;">
+                        <input type="checkbox" checked onchange="toggleSeries(0, this.checked)"> Temp. Keg (Czerwona)
+                    </label>
+                    <label style="cursor: pointer;">
+                        <input type="checkbox" checked onchange="toggleSeries(1, this.checked)"> Temp. Bufor (Niebieska)
+                    </label>
+                    <label style="cursor: pointer;">
+                        <input type="checkbox" checked onchange="toggleSeries(2, this.checked)"> Temp. 10p (Pomarańczowa)
+                    </label>
+                    <label style="cursor: pointer;">
+                        <input type="checkbox" checked onchange="toggleSeries(3, this.checked)"> Temp. Głowica (Zielona)
+                    </label>
+                    <label style="cursor: pointer;">
+                        <input type="checkbox" checked onchange="toggleSeries(4, this.checked)"> Temp. Woda (Fioletowa)
+                    </label>
+                    <label style="cursor: pointer;">
+                        <input type="checkbox" checked onchange="toggleSeries(5, this.checked)"> Moc (Szara, przerywana)
+                    </label>
+                </div>
+            </div>
             <canvas id="processChart"></canvas>
         </div>
     </div>
 
     <script>
         let isRecording = false;
+        let toggleInProgress = false;
 
-        // Inicjalizacja wykresu Chart.js (Dwie osie Y)
+        function setToggleButtonState() {
+            const btn = document.getElementById('btn_processToggle');
+            const btnText = document.getElementById('btn_text');
+            const spinner = document.getElementById('btn_spinner');
+
+            if (toggleInProgress) {
+                btn.disabled = true;
+                spinner.classList.remove('d-none');
+                btn.className = isRecording ? "btn btn-stop" : "btn btn-start";
+                btnText.innerText = isRecording ? "ZATRZYMYWANIE..." : "URUCHAMIANIE...";
+                return;
+            }
+
+            btn.disabled = false;
+            spinner.classList.add('d-none');
+            btn.className = isRecording ? "btn btn-stop" : "btn btn-start";
+            btnText.innerText = isRecording ? "KONIEC PROCESU" : "START PROCESU";
+        }
+
+        async function toggleProcess() {
+            if (toggleInProgress) return;
+
+            toggleInProgress = true;
+            setToggleButtonState();
+
+            try {
+                const response = await fetch('/api/process/toggle', { method: 'POST' });
+                if (!response.ok) throw new Error('HTTP error');
+
+                const result = await response.json();
+                isRecording = !!result.recording;
+            } catch (e) {
+                console.error(e);
+                alert("Nie udało się przełączyć procesu.");
+            } finally {
+                toggleInProgress = false;
+                setToggleButtonState();
+            }
+        }
+
         const ctx = document.getElementById('processChart').getContext('2d');
         const processChart = new Chart(ctx, {
             type: 'line',
             data: {
                 labels: [],
                 datasets: [
-                    { label: 'Keg', yAxisID: 'yTemp', data: [], borderColor: '#0A6ED1', tension: 0.1, pointRadius: 2 },
-                    { label: '10p', yAxisID: 'yTemp', data: [], borderColor: '#D32030', tension: 0.1, pointRadius: 2 },
-                    { label: 'Głowica', yAxisID: 'yTemp', data: [], borderColor: '#E38B00', tension: 0.1, pointRadius: 2 },
-                    { label: 'Moc (W)', yAxisID: 'yPower', data: [], borderColor: '#8A8D90', backgroundColor: 'rgba(138, 141, 144, 0.2)', fill: true, tension: 0.1, pointRadius: 0 }
+                    { label: 'Keg', yAxisID: 'yTemp', data: [], borderColor: '#D32030', tension: 0.1, pointRadius: 2 },
+                    { label: 'Bufor', yAxisID: 'yTemp', data: [], borderColor: '#0A6ED1', tension: 0.1, pointRadius: 2 },
+                    { label: '10p', yAxisID: 'yTemp', data: [], borderColor: '#E38B00', tension: 0.1, pointRadius: 2 },
+                    { label: 'Głowica', yAxisID: 'yTemp', data: [], borderColor: '#00A86B', tension: 0.1, pointRadius: 2 },
+                    { label: 'Woda', yAxisID: 'yTemp', data: [], borderColor: '#8E44AD', tension: 0.1, pointRadius: 2 },
+                    { label: 'Moc (W)', yAxisID: 'yPower', data: [], borderColor: '#8A8D90', backgroundColor: 'rgba(138, 141, 144, 0.2)', fill: true, tension: 0.1, pointRadius: 0, borderDash: [5, 5] }
                 ]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 interaction: { mode: 'index', intersect: false },
+                plugins: { legend: { display: false } },
                 scales: {
                     x: { display: true, title: { display: true, text: 'Czas' } },
-                    yTemp: { 
-                        type: 'linear', display: true, position: 'left', 
-                        title: { display: true, text: 'Temperatura (°C)' }
-                    },
-                    yPower: { 
-                        type: 'linear', display: true, position: 'right', 
-                        title: { display: true, text: 'Moc (W)' },
-                        grid: { drawOnChartArea: false } 
-                    }
+                    yTemp: { type: 'linear', display: true, position: 'left', title: { display: true, text: 'Temperatura (°C)' } },
+                    yPower: { type: 'linear', display: true, position: 'right', title: { display: true, text: 'Moc (W)' }, grid: { drawOnChartArea: false } }
                 }
             }
         });
 
-        // Konfiguracja SignalR
+        function loadChartHistory() {
+            fetch('/api/process/history')
+                .then(response => response.json())
+                .then(data => {
+                    processChart.data.labels = [];
+                    processChart.data.datasets.forEach(d => d.data = []);
+
+                    data.forEach(row => {
+                        processChart.data.labels.push(row.time);
+                        processChart.data.datasets[0].data.push(row.keg);
+                        processChart.data.datasets[1].data.push(row.bufor);
+                        processChart.data.datasets[2].data.push(row.temp10p);
+                        processChart.data.datasets[3].data.push(row.glowica);
+                        processChart.data.datasets[4].data.push(row.woda);
+                        processChart.data.datasets[5].data.push(row.power ?? null);
+                    });
+
+                    processChart.update();
+                })
+                .catch(err => console.error("Błąd pobierania historii wykresu:", err));
+        }
+
+        function toggleSeries(datasetIndex, isVisible) {
+            if (processChart.isDatasetVisible(datasetIndex) !== isVisible) {
+                processChart.setDatasetVisibility(datasetIndex, isVisible);
+                processChart.update();
+            }
+        }
+
         const connection = new signalR.HubConnectionBuilder()
             .withUrl("/dashboardHub")
             .withAutomaticReconnect()
             .build();
 
         connection.on("ReceiveProcessData", function (data) {
-            // 1. Aktualizacja Kafelków Temperatur
-            if(data.temperatures) {
-                document.getElementById('val_temp_keg').innerText = data.temperatures.Temp_Keg?.toFixed(2) + " °C";
-                document.getElementById('val_temp_bufor').innerText = data.temperatures.Temp_Bufor?.toFixed(2) + " °C";
-                document.getElementById('val_temp_10p').innerText = data.temperatures.Temp_10p?.toFixed(2) + " °C";
-                document.getElementById('val_temp_glowica').innerText = data.temperatures.Temp_Glowica?.toFixed(2) + " °C";
-                document.getElementById('val_temp_woda').innerText = data.temperatures.Temp_Woda?.toFixed(2) + " °C";
+            if (data.temperatures) {
+                document.getElementById('val_temp_keg').innerText = data.temperatures['Temp_Keg']?.toFixed(1) + " °C";
+                document.getElementById('val_temp_bufor').innerText = data.temperatures['Temp_Bufor']?.toFixed(1) + " °C";
+                document.getElementById('val_temp_10p').innerText = data.temperatures['Temp_10p']?.toFixed(1) + " °C";
+                document.getElementById('val_temp_glowica').innerText = data.temperatures['Temp_Glowica']?.toFixed(1) + " °C";
+                document.getElementById('val_temp_woda').innerText = data.temperatures['Temp_Woda']?.toFixed(1) + " °C";
             }
 
-            // 2. Aktualizacja Kafelków Energii
-            if(data.power) {
+            if (data.power) {
                 document.getElementById('val_voltage').innerText = data.power.voltage?.toFixed(1) + " V";
                 document.getElementById('val_current').innerText = data.power.current?.toFixed(2) + " A";
                 document.getElementById('val_power').innerText = data.power.power?.toFixed(0) + " W";
                 document.getElementById('val_energy').innerText = data.power.sessionEnergy?.toFixed(3) + " kWh";
-
             }
 
-            // 3. Status Zaworu SSR
-            const valveEl = document.getElementById('ui_valveStatus');
-            if(data.valveOpen) {
-                valveEl.innerText = "[ 230V - ON ]";
-                valveEl.style.color = "var(--fiori-red)"; // czerwony jak grzeje/otwarty
-            } else {
-                valveEl.innerText = "[ 230V - OFF ]";
-                valveEl.style.color = "var(--fiori-green)";
-            }
-
-            // 4. Aktualizacja Czasu i Statusu Nagrywania
+            // START TIME + DURATION
             document.getElementById('ui_duration').innerText = data.processDuration || "00:00:00";
-            if (data.isRecording && !isRecording) {
-                // Backend mówi, że nagrywa, aktualizujemy UI
-                isRecording = true;
-                const btn = document.getElementById('btn_processToggle');
-                btn.innerText = "STOP PROCESU";
-                btn.className = "btn btn-stop";
-                document.getElementById('ui_startTime').innerText = data.startTimeStr || new Date().toLocaleTimeString();
-              //  document.getElementById('ui_filename').value = data.fileName || "Trwa zapis...";
-              var fileNameEl = document.getElementById('ui_filename');
-                if (fileNameEl) {
-                    fileNameEl.value = data.fileName ? data.fileName : "Podaj nazwę pliku...";
-                }
-            } else if (!data.isRecording && isRecording) {
-                isRecording = false;
-                const btn = document.getElementById('btn_processToggle');
-                btn.innerText = "START PROCESU";
-                btn.className = "btn btn-start";
-            }
+            document.getElementById('ui_startTime').innerText = data.isRecording
+                ? (data.startTimeStr || "--:--:--")
+                : "--:--:--";
 
-            // 5. Aktualizacja Wykresu
+            isRecording = !!data.isRecording;
+            setToggleButtonState();
+
+            // LIVE points
             const now = new Date().toLocaleTimeString();
             processChart.data.labels.push(now);
-            processChart.data.datasets[0].data.push(data.temperatures.Temp_Keg);
-            processChart.data.datasets[1].data.push(data.temperatures.Temp_10p);
-            processChart.data.datasets[2].data.push(data.temperatures.Temp_Glowica);
-            processChart.data.datasets[3].data.push(data.power.Power);
+            processChart.data.datasets[0].data.push(data.temperatures?.Temp_Keg ?? null);
+            processChart.data.datasets[1].data.push(data.temperatures?.Temp_Bufor ?? null);
+            processChart.data.datasets[2].data.push(data.temperatures?.Temp_10p ?? null);
+            processChart.data.datasets[3].data.push(data.temperatures?.Temp_Glowica ?? null);
+            processChart.data.datasets[4].data.push(data.temperatures?.Temp_Woda ?? null);
+            processChart.data.datasets[5].data.push(data.power?.power ?? null);
 
-            if (processChart.data.labels.length > 60) {
+            if (processChart.data.labels.length > 120) {
                 processChart.data.labels.shift();
                 processChart.data.datasets.forEach(d => d.data.shift());
             }
+
             processChart.update();
         });
 
-        connection.start().catch(err => console.error(err.toString()));
+        /// 1) Dociąganie korekt z pliku konfiguracyjnego
+        async function loadCalibrations() {
+            try {
+                const response = await fetch('/api/config/calibrations');
+                if (!response.ok) throw new Error('HTTP error');
 
-        // --- Funkcje wysyłające dane do API Backendowego ---
+                const c = await response.json();
 
-       function toggleProcess() {
-            console.log("Kliknięto START/STOP"); // <--- Dodaj to
-            fetch('/api/process/toggle', { method: 'POST' })
-                .then(response => console.log('Otrzymano:', response.status)) // <--- Dodaj to
-                .catch(err => console.error('Błąd:', err));
-}
-
-        function sendCorrection(sensorName, offsetValue) {
-            fetch('/api/config/update-calibration', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sensorName: sensorName, offset: parseFloat(offsetValue) })
-            }).catch(err => console.error("Błąd aktualizacji korekty:", err));
+                document.getElementById('corr_temp_keg').value = c.temp_Keg ?? 0;
+                document.getElementById('corr_temp_bufor').value = c.temp_Bufor ?? 0;
+                document.getElementById('corr_temp_10p').value = c.temp_10p ?? 0;
+                document.getElementById('corr_temp_glowica').value = c.temp_Glowica ?? 0;
+                document.getElementById('corr_temp_woda').value = c.temp_Woda ?? 0;
+            } catch (err) {
+                console.error("Błąd pobierania korekt:", err);
+            }
         }
 
-        function updateComment(commentText) {
-            fetch('/api/process/comment', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ comment: commentText })
-            }).catch(err => console.error("Błąd aktualizacji komentarza:", err));
-        }
-        function updateFileName(newName) {
-            fetch('/api/process/set-filename', {
+        /// 2) updateFileName jako async (żeby mieć pewność, że backend przyjął nazwę)
+        async function updateFileName(newName) {
+            const response = await fetch('/api/process/set-filename', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name: newName })
             });
-}
+
+            if (!response.ok) {
+                throw new Error("Nie udało się ustawić nazwy pliku.");
+            }
+        }
+
+        /// 3) Inicjalizacja w poprawnej kolejności
+        async function initializeDashboard() {
+            try {
+                const fileName = document.getElementById('ui_filename').value;
+                await updateFileName(fileName);     // najpierw ustaw plik po stronie backendu
+                await loadCalibrations();           // potem dociągnij korekty
+                loadChartHistory();                 // potem historia wykresu
+
+                setInterval(loadChartHistory, 15000);
+
+                await connection.start();
+            } catch (err) {
+                console.error("Błąd inicjalizacji dashboardu:", err);
+            }
+        }
+
+        // zamień dotychczasowe wywołania końcowe na:
+        initializeDashboard();
+
+        /// Wysyłka korekty sensora do backendu
+        async function sendCorrection(sensorName, offsetValue) {
+            try {
+                await fetch('/api/config/update-calibration', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sensorName: sensorName, offset: parseFloat(offsetValue) })
+                });
+            } catch (err) {
+                console.error("Błąd aktualizacji korekty:", err);
+            }
+        }
+
+        /// Wysyłka komentarza do backendu (zapisywany później przez ProcessMonitorService do CSV)
+        async function updateComment(commentText) {
+            try {
+                const response = await fetch('/api/process/comment', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ comment: commentText ?? "" })
+                });
+
+                if (!response.ok) {
+                    throw new Error("HTTP error");
+                }
+            } catch (err) {
+                console.error("Błąd aktualizacji komentarza:", err);
+            }
+        }
     </script>
 </body>
 </html>

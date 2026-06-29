@@ -2,20 +2,46 @@
 {
     public class ProcessStateManager
     {
-        public bool IsRecording { get; private set; } = false;
-        public DateTime ProcessStartTime { get;  set; }
-        public string CurrentComment { get; set; } = "";
-        public string CurrentFileName { get; set; } = $"Log_Procesu.csv";
-   //     public string CustomFileName { get; set; } //= $"Log_{DateTime.Now:yyyyMMdd}.csv";
+        private readonly object _sync = new();
 
-        public void ToggleProcess()
+        public bool IsRecording { get; private set; } = false;
+        public DateTime ProcessStartTime { get; set; }
+        public string CurrentComment { get; set; } = "";
+        public string CurrentFileName { get; set; } = "Log_Procesu.csv";
+
+        /// <summary>
+        /// Starts recording process.
+        /// </summary>
+        public void StartProcess()
         {
-            IsRecording = !IsRecording;
-            //if (IsRecording)
-            //{
-            //    ProcessStartTime = DateTime.Now;
-            //  //  CurrentFileName = CustomFileName; // $"TuyaLog_{ProcessStartTime:yyyyMMdd_HHmmss}.csv";
-            //}
+            lock (_sync)
+            {
+                IsRecording = true;
+            }
+        }
+
+        /// <summary>
+        /// Stops recording process.
+        /// </summary>
+        public void StopProcess()
+        {
+            lock (_sync)
+            {
+                IsRecording = false;
+            }
+        }
+
+        /// <summary>
+        /// Toggles recording process state.
+        /// </summary>
+        /// <returns>Current recording state after toggle.</returns>
+        public bool ToggleProcess()
+        {
+            lock (_sync)
+            {
+                IsRecording = !IsRecording;
+                return IsRecording;
+            }
         }
     }
 }

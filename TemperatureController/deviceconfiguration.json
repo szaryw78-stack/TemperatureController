@@ -1,15 +1,24 @@
 {
   "ProcessConfig": {
     "DashboardRefreshIntervalMs": 5000,
+    "TuyaRefreshIntervalMs": 6000,
     "CsvLogIntervalMs": 6000,
     "ValveThresholdTemp": 78.3,
     "Calibrations": {
-      "Temp_Keg": 17,
-      "Temp_Bufor": -1,
-      "Temp_10p": 15,
-      "Temp_Glowica": 2,
+      "Temp_Keg": 1.5,
+      "Temp_Bufor": -1.0,
+      "Temp_10p": 2.0,
+      "Temp_Glowica": 2.0,
       "Temp_Woda": 1.5
-    },
-    "TuyaRefreshIntervalMs": 6000
+    }
+  },
+  "Devices": {
+    "Termometers": {
+      "Temp_Keg": "28-00000xxxxxx1",
+      "Temp_Bufor": "28-00000xxxxxx2",
+      "Temp_10p": "28-00000xxxxxx3",
+      "Temp_Glowica": "28-00000xxxxxx4",
+      "Temp_Woda": "28-00000xxxxxx5"
+    }
   }
 }

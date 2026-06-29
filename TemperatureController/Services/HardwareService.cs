@@ -16,14 +16,14 @@
         private readonly bool _useRaspberryPi;
         private readonly Random _rand = new Random();
 
-        private readonly Dictionary<string, string> _sensorMap = new()
-    {
-        { "Temp_Keg", "28-00000xxxxxx1" },
-        { "Temp_Bufor", "28-00000xxxxxx2" },
-        { "Temp_10p", "28-00000xxxxxx3" },
-        { "Temp_Glowica", "28-00000xxxxxx4" },
-        { "Temp_Woda", "28-00000xxxxxx5" }
-    };
+        private readonly Dictionary<string, string> _sensorMap = new();
+    //{
+    //    { "Temp_Keg", "28-00000xxxxxx1" },
+    //    { "Temp_Bufor", "28-00000xxxxxx2" },
+    //    { "Temp_10p", "28-00000xxxxxx3" },
+    //    { "Temp_Glowica", "28-00000xxxxxx4" },
+    //    { "Temp_Woda", "28-00000xxxxxx5" }
+    //};
 
         public HardwareService(IConfiguration config)
         {
@@ -49,7 +49,7 @@
             }
         }
 
-        public double GetTemperature(string sensorName)
+        public double GetTemperature(string sensorName, Dictionary<string, string> sensorMap)
         {
             // Zwracamy symulowane wartości, aby dashboard i wykres żyły
             if (!_useRaspberryPi)

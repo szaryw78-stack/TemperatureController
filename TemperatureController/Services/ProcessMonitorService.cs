@@ -38,9 +38,6 @@
                 try
                 {
 
-                  
-
-
                     // 1. Wczytaj konfigurację
                     var configData = await File.ReadAllTextAsync("deviceconfiguration.json", stoppingToken);
                     var deviceConfig = JsonSerializer.Deserialize<DynamicConfig>(configData);
@@ -65,13 +62,13 @@
 
                     // 2. Odczyt temperatur (zawsze lokalne, więc szybkie)
                     var temps = new Dictionary<string, double>
-            {
-                { "Temp_Keg", _hardware.GetTemperature("Temp_Keg") + cfg.Calibrations.Temp_Keg },
-                { "Temp_Bufor", _hardware.GetTemperature("Temp_Bufor") + cfg.Calibrations.Temp_Bufor },
-                { "Temp_10p", _hardware.GetTemperature("Temp_10p") + cfg.Calibrations.Temp_10p },
-                { "Temp_Glowica", _hardware.GetTemperature("Temp_Glowica") + cfg.Calibrations.Temp_Glowica },
-                { "Temp_Woda", _hardware.GetTemperature("Temp_Woda") + cfg.Calibrations.Temp_Woda }
-            };
+                        {
+                            { "Temp_Keg", _hardware.GetTemperature("Temp_Keg",deviceConfig.Devices.Termometers) + cfg.Calibrations.Temp_Keg },
+                            { "Temp_Bufor", _hardware.GetTemperature("Temp_Bufor",deviceConfig.Devices.Termometers) + cfg.Calibrations.Temp_Bufor },
+                            { "Temp_10p", _hardware.GetTemperature("Temp_10p",deviceConfig.Devices.Termometers) + cfg.Calibrations.Temp_10p },
+                            { "Temp_Glowica", _hardware.GetTemperature("Temp_Glowica",deviceConfig.Devices.Termometers) + cfg.Calibrations.Temp_Glowica },
+                            { "Temp_Woda", _hardware.GetTemperature("Temp_Woda",deviceConfig.Devices.Termometers) + cfg.Calibrations.Temp_Woda }
+                        };
 
                     // 3. Sterowanie zaworem
                     bool valveOpen = temps["Temp_10p"] > cfg.ValveThresholdTemp;
@@ -96,6 +93,20 @@
                         FileName = _state.CurrentFileName,
                         StartTimeStr = _state.IsRecording ? _state.ProcessStartTime.ToString("yyyy-MM-dd HH:mm:ss") : "--:--:--"
                     };
+                    //ProcessLogPayload payload;
+                    //if (_state.IsRecording)
+                    //{
+                    //    // Jeśli nagrywamy, bierzemy dane z pliku (po zapisaniu nowej linii)
+                    //    payload = GetPayloadFromFile();
+                    //    // Uzupełniamy brakujące informacje o stanie
+                    //    payload.FileName = _state.CurrentFileName;
+                    //    payload.StartTimeStr = _state.ProcessStartTime.ToString("yyyy-MM-dd HH:mm:ss");
+                    //}
+                    //else
+                    //{
+                    //    // Jeśli nie nagrywamy, pokazujemy stan zerowy lub bieżący odczyt
+                    //    payload = new ProcessLogPayload { /* wypełnij zerami */ };
+                    //}
 
                     // 6. Wypchnięcie danych na Dashboard (SignalR zawsze dostaje dane co DashboardRefreshIntervalMs)
                     await _hubContext.Clients.All.SendAsync("ReceiveProcessData", payload, stoppingToken);
@@ -117,7 +128,50 @@
                 }
             }
         }
+        private ProcessLogPayload GetPayloadFromFile()
+        {
+            var fileName = _state.CurrentFileName;
+            if (!fileName.EndsWith(".csv")) fileName += ".csv";
+            if (!File.Exists(fileName)) return new ProcessLogPayload(); // Pusty obiekt, jeśli brak pliku
 
+            try
+            {
+                // Odczytujemy wszystkie linie i bierzemy ostatnią (niepustą)
+                var lines = File.ReadAllLines(fileName);
+                var lastLine = lines.LastOrDefault(l => !string.IsNullOrWhiteSpace(l));
+                if (lastLine == null) return new ProcessLogPayload();
+
+                var parts = lastLine.Split(';');
+                if (parts.Length < 12) return new ProcessLogPayload();
+
+                var culture = new System.Globalization.CultureInfo("pl-PL");
+
+                return new ProcessLogPayload
+                {
+                    Temperatures = new Dictionary<string, double> {
+                { "Temp_Keg", double.Parse(parts[2], culture) },
+                { "Temp_Bufor", double.Parse(parts[3], culture) },
+                { "Temp_10p", double.Parse(parts[4], culture) },
+                { "Temp_Glowica", double.Parse(parts[5], culture) },
+                { "Temp_Woda", double.Parse(parts[6], culture) }
+            },
+                    Power = new TemperatureController.Tuya.PowerMetrics
+                    {
+                        Voltage = double.Parse(parts[7], culture),
+                        Current = double.Parse(parts[8], culture),
+                        Power = double.Parse(parts[9], culture),
+                        SessionEnergy = double.Parse(parts[10], culture)
+                    },
+                    IsRecording = _state.IsRecording,
+                    ProcessDuration = parts[1]
+                };
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Błąd odczytu danych z pliku: {ex.Message}");
+                return new ProcessLogPayload();
+            }
+        }
         private void SaveToCsv(ProcessLogPayload payload)
         {
             try

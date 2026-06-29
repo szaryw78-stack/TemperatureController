@@ -25,6 +25,17 @@ namespace TemperatureController.Controllers
         }
 
         /// <summary>
+        /// Gets current calibration values from configuration file.
+        /// </summary>
+        /// <returns>Calibration object.</returns>
+        [HttpGet("calibrations")]
+        public ActionResult<Calibrations> GetCalibrations()
+        {
+            var config = _configFileService.Read();
+            return Ok(config.ProcessConfig.Calibrations);
+        }
+
+        /// <summary>
         /// Updates calibration offset for a selected sensor.
         /// </summary>
         /// <param name="update">Calibration update request.</param>
