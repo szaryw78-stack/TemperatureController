@@ -1,0 +1,15 @@
+{
+  "ProcessConfig": {
+    "DashboardRefreshIntervalMs": 5000,
+    "CsvLogIntervalMs": 6000,
+    "ValveThresholdTemp": 78.3,
+    "Calibrations": {
+      "Temp_Keg": 17,
+      "Temp_Bufor": -1,
+      "Temp_10p": 15,
+      "Temp_Glowica": 2,
+      "Temp_Woda": 1.5
+    },
+    "TuyaRefreshIntervalMs": 6000
+  }
+}
