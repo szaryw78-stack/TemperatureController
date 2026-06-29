@@ -9,20 +9,38 @@
     {
         private readonly HardwareService _hardware;
         private readonly ITuyaService _tuya;
+        private readonly IWeatherService _weatherService;
         private readonly IHubContext<DashboardHub> _hubContext;
         private readonly ProcessStateManager _state;
         private DateTime _lastCsvLog = DateTime.MinValue;
         private DateTime _lastTuyaRefresh = DateTime.MinValue;
         private PowerMetrics _cachedPower = new PowerMetrics(); // Pamięć podręczna
+        private DateTime _lastWeatherRefresh = DateTime.MinValue;
+        private WeatherReadingDto _cachedWeather = new();
+        private static readonly TimeSpan WeatherRefreshInterval = TimeSpan.FromMinutes(5);
+        private const string CsvHeader =
+    "Czas_Zapisu;Czas_Procesu;" +
+    "1_Temp_Keg;2_Temp_Bufor;3_Temp_10p;4_Temp_Glowica;5_Temp_Woda;" +
+    "Napiecie_V;Prad_A;Moc_W;Zuzycie_Wh;Temp_Zewn_C;Cisnienie_hPa;Komentarz";
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ProcessMonitorService"/> class.
+        /// </summary>
+        /// <param name="hardware">Hardware service.</param>
+        /// <param name="tuya">Tuya service.</param>
+        /// <param name="weatherService">Weather service.</param>
+        /// <param name="hub">SignalR hub context.</param>
+        /// <param name="state">Shared process state.</param>
         public ProcessMonitorService(
             HardwareService hardware,
             ITuyaService tuya,
+            IWeatherService weatherService,
             IHubContext<DashboardHub> hub,
             ProcessStateManager state) // Wstrzykujemy naszego zarządcę stanu
         {
             _hardware = hardware;
             _tuya = tuya;
+            _weatherService = weatherService;
             _hubContext = hub;
             _state = state;
         }
@@ -83,6 +101,20 @@
                         _lastTuyaRefresh = DateTime.Now;
                     }
 
+                    // 3) W ExecuteAsync (obok odświeżania Tuya) dodaj odświeżanie pogody
+                    if ((DateTime.Now - _lastWeatherRefresh) >= WeatherRefreshInterval)
+                    {
+                        try
+                        {
+                            _cachedWeather = await _weatherService.GetCurrentAsync(cancellationToken: stoppingToken);
+                            _lastWeatherRefresh = DateTime.Now;
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"Błąd pobierania pogody: {ex.Message}");
+                        }
+                    }
+
                     // 5. Przygotowanie paczki danych (korzystamy z bufora _cachedPower)
                     var payload = new ProcessLogPayload
                     {
@@ -91,7 +123,9 @@
                         IsRecording = _state.IsRecording,
                         ProcessDuration = _state.IsRecording ? (DateTime.Now - _state.ProcessStartTime).ToString(@"hh\:mm\:ss") : "00:00:00",
                         FileName = _state.CurrentFileName,
-                        StartTimeStr = _state.IsRecording ? _state.ProcessStartTime.ToString("yyyy-MM-dd HH:mm:ss") : "--:--:--"
+                        StartTimeStr = _state.IsRecording ? _state.ProcessStartTime.ToString("yyyy-MM-dd HH:mm:ss") : "--:--:--",
+                        WeatherTemperatureC = _cachedWeather.TemperatureC,
+                        WeatherPressureHpa = _cachedWeather.PressureHpa
                     };
                     //ProcessLogPayload payload;
                     //if (_state.IsRecording)
@@ -207,25 +241,22 @@
                 // Pobranie aktualnego komentarza ze wspólnego stanu!
                 string cleanComment = _state.CurrentComment?.Replace("\r", "").Replace("\n", " ").Replace(";", ",") ?? "";
 
-                var line = $"{DateTime.Now:HH:mm:ss};" +
+                // 5) W SaveToCsv dopisz kolumny
+                string weatherTemp = payload.WeatherTemperatureC.ToString("F1", culture);
+                string weatherPressure = payload.WeatherPressureHpa.ToString("F1", culture);
+
+                var line = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss};" +
                            $"{payload.ProcessDuration};" +
                            $"{tempKeg};{tempBufor};{temp10p};{tempGlowica};{tempWoda};" +
                            $"{voltage};{current};{powerActive};{energy};" +
+                           $"{weatherTemp};{weatherPressure};" +
                            $"{cleanComment}\n";
 
                 // Pobranie nazwy pliku ze wspólnego stanu!
                 string fileName = _state.CurrentFileName;
                 if (!fileName.EndsWith(".csv")) fileName += ".csv";
 
-                // Tworzenie nagłówka, jeśli to początek pliku
-                if (!File.Exists(fileName))
-                {
-                    var header = "Czas_Zapisu;Czas_Procesu;" +
-                                 "1_Temp_Keg;2_Temp_Bufor;3_Temp_10p;4_Temp_Glowica;5_Temp_Woda;" +
-                                 "Napiecie_V;Prad_A;Moc_W;Zuzycie_Wh;Komentarz\n";
-
-                    File.WriteAllText(fileName, header);
-                }
+                EnsureCsvHeader(fileName);
 
                 File.AppendAllText(fileName, line);
             }
@@ -234,6 +265,51 @@
                 Console.WriteLine($"Błąd zapisu do pliku CSV: {ex.Message}");
             }
         }
+
+        /// <summary>
+/// Ensures CSV header is up to date and migrates legacy rows to new column layout.
+/// </summary>
+/// <param name="fileName">CSV file path.</param>
+private void EnsureCsvHeader(string fileName)
+{
+    if (!File.Exists(fileName))
+    {
+        File.WriteAllText(fileName, CsvHeader + Environment.NewLine);
+        return;
+    }
+
+    var lines = File.ReadAllLines(fileName).ToList();
+    if (lines.Count == 0)
+    {
+        File.WriteAllText(fileName, CsvHeader + Environment.NewLine);
+        return;
+    }
+
+    // Header already correct
+    if (string.Equals(lines[0], CsvHeader, StringComparison.Ordinal))
+    {
+        return;
+    }
+
+    // Replace old header and migrate old rows:
+    // OLD: 12 kolumn (bez pogody), NEW: 14 kolumn (z pogodą)
+    lines[0] = CsvHeader;
+    for (var i = 1; i < lines.Count; i++)
+    {
+        if (string.IsNullOrWhiteSpace(lines[i])) continue;
+
+        var parts = lines[i].Split(';');
+        if (parts.Length == 12)
+        {
+            // Wstaw puste: Temp_Zewn_C i Cisnienie_hPa przed komentarzem
+            var migrated = parts.Take(11)
+                                .Concat(new[] { "", "", parts[11] });
+            lines[i] = string.Join(';', migrated);
+        }
+    }
+
+    File.WriteAllLines(fileName, lines);
+}
     }
     public class DashboardHub : Hub
     {
@@ -248,5 +324,7 @@
         public string ProcessDuration { get; set; }
         public string FileName { get; set; }
         public string StartTimeStr { get; set; }
+        public double WeatherTemperatureC { get; set; } // Nowe pole na temperaturę z pogody
+        public double WeatherPressureHpa { get; set; } // Nowe pole na ciśnienie z pogody
     }
 }

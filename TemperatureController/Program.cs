@@ -16,6 +16,12 @@ builder.Services.AddHostedService<ProcessMonitorService>();
 builder.Services.AddScoped<IConfigFileService, ConfigFileService>();
 builder.Services.AddScoped<ICalibrationService, CalibrationService>();
 
+builder.Services.Configure<WeatherOptions>(builder.Configuration.GetSection("Weather"));
+builder.Services.AddHttpClient<IWeatherService, OpenMeteoWeatherService>(httpClient =>
+{
+    httpClient.BaseAddress = new Uri("https://api.open-meteo.com");
+});
+
 var app = builder.Build();
 
 if (!app.Environment.IsDevelopment())
@@ -30,15 +36,10 @@ app.UseAuthorization();
 
 app.MapStaticAssets();
 
-//app.MapControllerRoute(
-//    name: "default",
-//    pattern: "{controller=Home}/{action=Index}/{id?}")
-//    .WithStaticAssets();
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}")
     .WithStaticAssets();
-
 
 app.MapHub<DashboardHub>("/dashboardHub");
 app.MapControllers();

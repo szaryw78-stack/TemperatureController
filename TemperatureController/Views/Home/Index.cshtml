@@ -178,6 +178,33 @@
         @@keyframes spin {
     100% { transform: rotate(360deg); }
 }
+
+.correction-control {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .corr-btn {
+        width: 34px;
+        height: 34px;
+        border: 1px solid var(--fiori-border);
+        background: #fff;
+        border-radius: 6px;
+        font-size: 22px;
+        line-height: 1;
+        cursor: pointer;
+    }
+
+    .corr-value {
+        min-width: 68px;
+        text-align: center;
+        font-weight: 600;
+        border: 1px solid var(--fiori-border);
+        border-radius: 6px;
+        padding: 7px 6px;
+        background: #f8f8f8;
+    }
     </style>
 </head>
 <body>
@@ -227,7 +254,11 @@
                 <div class="tile-value" id="val_temp_keg">-- °C</div>
                 <div class="tile-controls">
                     <span>Korekta:</span>
-                    <input type="number" class="correction-input" id="corr_temp_keg" step="0.05" min="-15" max="15" value="0" onchange="sendCorrection('Temp_Keg', this.value)">
+                    <div class="correction-control">
+                        <button class="corr-btn" onclick="changeCorrection('corr_temp_keg', -0.05)">-</button>
+                        <div class="corr-value" id="corr_temp_keg">0</div>
+                        <button class="corr-btn" onclick="changeCorrection('corr_temp_keg', 0.05)">+</button>
+                    </div>
                 </div>
             </div>
             <div class="tile">
@@ -235,7 +266,11 @@
                 <div class="tile-value" id="val_temp_bufor">-- °C</div>
                 <div class="tile-controls">
                     <span>Korekta:</span>
-                    <input type="number" class="correction-input" id="corr_temp_bufor" step="0.05" min="-15" max="15" value="0" onchange="sendCorrection('Temp_Bufor', this.value)">
+                    <div class="correction-control">
+                        <button class="corr-btn" onclick="changeCorrection('corr_temp_bufor', -0.05)">-</button>
+                        <div class="corr-value" id="corr_temp_bufor">0</div>
+                        <button class="corr-btn" onclick="changeCorrection('corr_temp_bufor', 0.05)">+</button>
+                    </div>
                 </div>
             </div>
             <div class="tile">
@@ -243,7 +278,11 @@
                 <div class="tile-value" id="val_temp_10p">-- °C</div>
                 <div class="tile-controls">
                     <span>Korekta:</span>
-                    <input type="number" class="correction-input" id="corr_temp_10p" step="0.05" min="-15" max="15" value="0" onchange="sendCorrection('Temp_10p', this.value)">
+                    <div class="correction-control">
+                        <button class="corr-btn" onclick="changeCorrection('corr_temp_10p', -0.05)">-</button>
+                        <div class="corr-value" id="corr_temp_10p">0</div>
+                        <button class="corr-btn" onclick="changeCorrection('corr_temp_10p', 0.05)">+</button>
+                    </div>
                 </div>
             </div>
             <div class="tile">
@@ -251,7 +290,11 @@
                 <div class="tile-value" id="val_temp_glowica">-- °C</div>
                 <div class="tile-controls">
                     <span>Korekta:</span>
-                    <input type="number" class="correction-input" id="corr_temp_glowica" step="0.05" min="-15" max="15" value="0" onchange="sendCorrection('Temp_Glowica', this.value)">
+                    <div class="correction-control">
+                        <button class="corr-btn" onclick="changeCorrection('corr_temp_glowica', -0.05)">-</button>
+                        <div class="corr-value" id="corr_temp_glowica">0</div>
+                        <button class="corr-btn" onclick="changeCorrection('corr_temp_glowica', 0.05)">+</button>
+                    </div>
                 </div>
             </div>
             <div class="tile">
@@ -259,7 +302,11 @@
                 <div class="tile-value" id="val_temp_woda">-- °C</div>
                 <div class="tile-controls">
                     <span>Korekta:</span>
-                    <input type="number" class="correction-input" id="corr_temp_woda" step="0.05" min="-15" max="15" value="0" onchange="sendCorrection('Temp_Woda', this.value)">
+                    <div class="correction-control">
+                        <button class="corr-btn" onclick="changeCorrection('corr_temp_woda', -0.05)">-</button>
+                        <div class="corr-value" id="corr_temp_woda">0</div>
+                        <button class="corr-btn" onclick="changeCorrection('corr_temp_woda', 0.05)">+</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -310,6 +357,18 @@
                 </div>
             </div>
             <canvas id="processChart"></canvas>
+        </div>
+
+        <div class="section-title">Sekcja 3: Pogoda</div>
+        <div class="tiles-grid">
+            <div class="tile">
+                <div class="tile-header">Temperatura zewnętrzna</div>
+                <div class="tile-value" id="val_weather_temp">-- °C</div>
+            </div>
+            <div class="tile">
+                <div class="tile-header">Ciśnienie atmosferyczne</div>
+                <div class="tile-value" id="val_weather_pressure">-- hPa</div>
+            </div>
         </div>
     </div>
 
@@ -469,11 +528,17 @@
 
                 const c = await response.json();
 
-                document.getElementById('corr_temp_keg').value = c.temp_Keg ?? 0;
-                document.getElementById('corr_temp_bufor').value = c.temp_Bufor ?? 0;
-                document.getElementById('corr_temp_10p').value = c.temp_10p ?? 0;
-                document.getElementById('corr_temp_glowica').value = c.temp_Glowica ?? 0;
-                document.getElementById('corr_temp_woda').value = c.temp_Woda ?? 0;
+                correctionMap.Temp_Keg.value = c.temp_Keg ?? 0;
+                correctionMap.Temp_Bufor.value = c.temp_Bufor ?? 0;
+                correctionMap.Temp_10p.value = c.temp_10p ?? 0;
+                correctionMap.Temp_Glowica.value = c.temp_Glowica ?? 0;
+                correctionMap.Temp_Woda.value = c.temp_Woda ?? 0;
+
+                renderCorrection('Temp_Keg');
+                renderCorrection('Temp_Bufor');
+                renderCorrection('Temp_10p');
+                renderCorrection('Temp_Glowica');
+                renderCorrection('Temp_Woda');
             } catch (err) {
                 console.error("Błąd pobierania korekt:", err);
             }
@@ -496,19 +561,21 @@
         async function initializeDashboard() {
             try {
                 const fileName = document.getElementById('ui_filename').value;
-                await updateFileName(fileName);     // najpierw ustaw plik po stronie backendu
-                await loadCalibrations();           // potem dociągnij korekty
-                loadChartHistory();                 // potem historia wykresu
+                await updateFileName(fileName);
+                await loadCalibrations();
+                loadChartHistory();
 
                 setInterval(loadChartHistory, 15000);
 
                 await connection.start();
+
+                await loadWeather();
+                setInterval(loadWeather, 300000); // co 5 min
             } catch (err) {
                 console.error("Błąd inicjalizacji dashboardu:", err);
             }
         }
 
-        // zamień dotychczasowe wywołania końcowe na:
         initializeDashboard();
 
         /// Wysyłka korekty sensora do backendu
@@ -539,6 +606,51 @@
             } catch (err) {
                 console.error("Błąd aktualizacji komentarza:", err);
             }
+        }
+
+        async function loadWeather() {
+            try {
+                const response = await fetch('/api/weather/current');
+                if (!response.ok) throw new Error('HTTP error');
+
+                const weather = await response.json();
+                document.getElementById('val_weather_temp').innerText = `${weather.temperatureC.toFixed(1)} °C`;
+                document.getElementById('val_weather_pressure').innerText = `${weather.pressureHpa.toFixed(1)} hPa`;
+            } catch (err) {
+                console.error("Błąd pobierania pogody:", err);
+            }
+        }
+
+        setInterval(loadWeather, 300000); // co 5 minut
+
+        const correctionMap = {
+            Temp_Keg: { valueEl: 'corr_temp_keg', value: 0 },
+            Temp_Bufor: { valueEl: 'corr_temp_bufor', value: 0 },
+            Temp_10p: { valueEl: 'corr_temp_10p', value: 0 },
+            Temp_Glowica: { valueEl: 'corr_temp_glowica', value: 0 },
+            Temp_Woda: { valueEl: 'corr_temp_woda', value: 0 }
+        };
+
+        function renderCorrection(sensorName) {
+            const c = correctionMap[sensorName];
+            document.getElementById(c.valueEl).innerText = c.value.toFixed(2);
+        }
+
+        async function changeCorrection(valueEl, delta) {
+            const sensorNameMap = {
+                corr_temp_keg: "Temp_Keg",
+                corr_temp_bufor: "Temp_Bufor",
+                corr_temp_10p: "Temp_10p",
+                corr_temp_glowica: "Temp_Glowica",
+                corr_temp_woda: "Temp_Woda"
+            };
+
+            const sensorName = sensorNameMap[valueEl];
+            const c = correctionMap[sensorName];
+
+            c.value = Math.max(-15, Math.min(15, +(c.value + delta).toFixed(2)));
+            renderCorrection(sensorName);
+            await sendCorrection(sensorName, c.value);
         }
     </script>
 </body>
