@@ -4,10 +4,10 @@
     "CsvLogIntervalMs": 6000,
     "ValveThresholdTemp": 78.3,
     "Calibrations": {
-      "Temp_Keg": 1.8,
-      "Temp_Bufor": 0.7,
-      "Temp_10p": 2,
-      "Temp_Glowica": 2,
+      "Temp_Keg": 2.7,
+      "Temp_Bufor": 1.2,
+      "Temp_10p": 2.2,
+      "Temp_Glowica": 2.45,
       "Temp_Woda": 1.5
     },
     "TuyaRefreshIntervalMs": 6000
