@@ -1,4 +1,7 @@
-﻿<!DOCTYPE html>
+﻿@* @using Microsoft.Extensions.Configuration
+@inject IConfiguration Configuration *@
+
+<!DOCTYPE html>
 <html lang="pl">
 <head>
     <meta charset="utf-8" />
@@ -311,7 +314,7 @@
             </div>
         </div>
 
-        <div class="section-title">Sekcja 2: Zarządzanie energią</div>
+      @*   <div class="section-title">Sekcja 2: Zarządzanie energią</div>
         <div class="tiles-grid">
             <div class="tile">
                 <div class="tile-header">Napięcie</div>
@@ -329,8 +332,100 @@
                 <div class="tile-header">Zużyta Moc w Sesji</div>
                 <div class="tile-value" id="val_energy">-- kWh</div>
             </div>
-        </div>
+        </div> *@
+      @*   <div class="section-title">Sekcja 2: Zarządzanie energią</div>
+        
+        @{
+            var visibleTuyaDevices = new List<string>();
+            try
+            {
+                // Bezpośredni odczyt Twojego pliku bez ingerencji w IConfiguration
+                var configPath = System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "deviceconfiguration.json");
+                if (System.IO.File.Exists(configPath))
+                {
+                    var jsonText = System.IO.File.ReadAllText(configPath);
+                    using (var document = System.Text.Json.JsonDocument.Parse(jsonText))
+                    {
+                        if (document.RootElement.TryGetProperty("Tuya", out var tuyaElement))
+                        {
+                            foreach (var device in tuyaElement.EnumerateObject())
+                            {
+                                if (device.Value.TryGetProperty("VisibleOnDashboard", out var visibleProp) && visibleProp.ValueKind == System.Text.Json.JsonValueKind.True)
+                                {
+                                    visibleTuyaDevices.Add(device.Name); // Doda m.in. "Column", "Pump"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Zabezpieczenie na wypadek problemów z plikiem JSON
+                Console.WriteLine("Błąd odczytu deviceconfiguration.json: " + ex.Message);
+            }
+        }
 
+        @if(visibleTuyaDevices.Count == 0)
+        {
+            <div style="color: red; margin-bottom: 20px;">Brak urządzeń do wyświetlenia lub błąd odczytu z pliku deviceconfiguration.json.</div>
+        }
+
+        @foreach(var deviceName in visibleTuyaDevices)
+        {
+            <div style="margin-bottom: 5px; font-weight: bold; color: var(--fiori-blue);">Moduł: @deviceName</div>
+            <div class="tiles-grid" style="margin-bottom: 25px;">
+                <div class="tile">
+                    <div class="tile-header">Napięcie</div>
+                    <div class="tile-value" id="val_voltage_@deviceName">-- V</div>
+                </div>
+                <div class="tile">
+                    <div class="tile-header">Prąd</div>
+                    <div class="tile-value" id="val_current_@deviceName">-- A</div>
+                </div>
+                <div class="tile">
+                    <div class="tile-header">Moc Bieżąca</div>
+                    <div class="tile-value" id="val_power_@deviceName">-- W</div>
+                </div>
+                <div class="tile">
+                    <div class="tile-header">Zużyta Moc w Sesji</div>
+                    <div class="tile-value" id="val_energy_@deviceName">-- kWh</div>
+                </div>
+            </div>
+        } *@
+        <div class="section-title">Sekcja 2: Zarządzanie energią</div>
+        
+        @{
+            var configPath = System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "deviceconfiguration.json");
+            var visibleDevices = new List<string>();
+            if (System.IO.File.Exists(configPath))
+            {
+                var json = System.IO.File.ReadAllText(configPath);
+                using (var doc = System.Text.Json.JsonDocument.Parse(json))
+                {
+                    if (doc.RootElement.TryGetProperty("Tuya", out var tuya))
+                    {
+                        foreach (var dev in tuya.EnumerateObject())
+                        {
+                            if (dev.Value.TryGetProperty("VisibleOnDashboard", out var vis) && vis.GetBoolean())
+                                visibleDevices.Add(dev.Name);
+                        }
+                    }
+                }
+            }
+        }
+
+        @foreach(var dev in visibleDevices)
+        {
+            <div style="margin: 15px 0 5px 0; font-weight: bold; color: var(--fiori-blue);">@dev</div>
+            <div class="tiles-grid">
+                <div class="tile"><div class="tile-header">Napięcie</div><div class="tile-value" id="val_voltage_@dev">-- V</div></div>
+                <div class="tile"><div class="tile-header">Prąd</div><div class="tile-value" id="val_current_@dev">-- A</div></div>
+                <div class="tile"><div class="tile-header">Moc</div><div class="tile-value" id="val_power_@dev">-- W</div></div>
+                <div class="tile"><div class="tile-header">Sesja</div><div class="tile-value" id="val_energy_@dev">-- kWh</div></div>
+            </div>
+        }
+        @* wykres *@
         <div class="section-title">Wykres online (SignalR)</div>
         <div class="chart-container">
             <div class="control-item" style="margin-bottom: 15px;">
@@ -477,6 +572,25 @@
             .withAutomaticReconnect()
             .build();
 
+        // connection.on("ReceiveProcessData", function (data) {
+        //     if (data.temperatures) {
+        //         document.getElementById('val_temp_keg').innerText = data.temperatures['Temp_Keg']?.toFixed(2) + " °C";
+        //         document.getElementById('val_temp_bufor').innerText = data.temperatures['Temp_Bufor']?.toFixed(2) + " °C";
+        //         document.getElementById('val_temp_10p').innerText = data.temperatures['Temp_10p']?.toFixed(2) + " °C";
+        //         document.getElementById('val_temp_glowica').innerText = data.temperatures['Temp_Glowica']?.toFixed(2) + " °C";
+        //         document.getElementById('val_temp_woda').innerText = data.temperatures['Temp_Woda']?.toFixed(2) + " °C";
+        //     }
+
+        //     if (data.power) {
+        //         document.getElementById('val_voltage').innerText = data.power.voltage?.toFixed(1) + " V";
+        //         document.getElementById('val_current').innerText = data.power.current?.toFixed(2) + " A";
+        //         document.getElementById('val_power').innerText = data.power.power?.toFixed(0) + " W";
+        //         document.getElementById('val_energy').innerText = data.power.sessionEnergy?.toFixed(3) + " kWh";
+        //     }
+        // Przekazanie listy widocznych urządzeń z poziomu backendu do JavaScriptu
+         @* const activeTuyaDevices = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(visibleTuyaDevices));*@
+        const activeDevices = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(visibleDevices));
+
         connection.on("ReceiveProcessData", function (data) {
             if (data.temperatures) {
                 document.getElementById('val_temp_keg').innerText = data.temperatures['Temp_Keg']?.toFixed(2) + " °C";
@@ -486,12 +600,41 @@
                 document.getElementById('val_temp_woda').innerText = data.temperatures['Temp_Woda']?.toFixed(2) + " °C";
             }
 
+            // DYNAMICZNA OBSŁUGA DANYCH ENERGETYCZNYCH
+            // if (data.power) {
+            //     activeTuyaDevices.forEach(deviceName => {
+            //         // Odczytujemy dane dla danego urządzenia (jeśli serwer podaje je w słowniku np. data.power["Column"])
+            //         const devicePowerData = data.power[deviceName] || data.power; 
+                    
+            //         if (devicePowerData) {
+            //             const elVoltage = document.getElementById('val_voltage_' + deviceName);
+            //             const elCurrent = document.getElementById('val_current_' + deviceName);
+            //             const elPower = document.getElementById('val_power_' + deviceName);
+            //             const elEnergy = document.getElementById('val_energy_' + deviceName);
+
+            //             // Sprawdzamy czy dany element HTML faktycznie wygenerował się w DOM
+            //             if (elVoltage) elVoltage.innerText = (devicePowerData.voltage || 0).toFixed(1) + " V";
+            //             if (elCurrent) elCurrent.innerText = (devicePowerData.current || 0).toFixed(2) + " A";
+            //             if (elPower) elPower.innerText = (devicePowerData.power || 0).toFixed(0) + " W";
+            //             if (elEnergy) elEnergy.innerText = (devicePowerData.sessionEnergy || 0).toFixed(3) + " kWh";
+            //         }
+            //     });
+            // }
             if (data.power) {
-                document.getElementById('val_voltage').innerText = data.power.voltage?.toFixed(1) + " V";
-                document.getElementById('val_current').innerText = data.power.current?.toFixed(2) + " A";
-                document.getElementById('val_power').innerText = data.power.power?.toFixed(0) + " W";
-                document.getElementById('val_energy').innerText = data.power.sessionEnergy?.toFixed(3) + " kWh";
+                activeDevices.forEach(dev => {
+                    const d = data.powerByDevice?.[dev];
+                    if (d) {
+                        document.getElementById('val_voltage_' + dev).innerText = (d.voltage || 0).toFixed(1) + " V";
+                        document.getElementById('val_current_' + dev).innerText = (d.current || 0).toFixed(2) + " A";
+                        document.getElementById('val_power_' + dev).innerText = (d.power || 0).toFixed(0) + " W";
+                        document.getElementById('val_energy_' + dev).innerText = (d.sessionEnergy || 0).toFixed(3) + " kWh";
+                    }
+                });
             }
+
+            // START TIME + DURATION
+            document.getElementById('ui_duration').innerText = data.processDuration || "00:00:00";
+            // ... (reszta kodu wykresu i czasu zostaje bez zmian)
 
             // START TIME + DURATION
             document.getElementById('ui_duration').innerText = data.processDuration || "00:00:00";

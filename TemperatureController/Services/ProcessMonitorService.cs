@@ -22,6 +22,7 @@
     "Czas_Zapisu;Czas_Procesu;" +
     "1_Temp_Keg;2_Temp_Bufor;3_Temp_10p;4_Temp_Glowica;5_Temp_Woda;" +
     "Napiecie_V;Prad_A;Moc_W;Zuzycie_Wh;Temp_Zewn_C;Cisnienie_hPa;Komentarz";
+        private Dictionary<string, PowerMetrics> _cachedPowerMetrics = new(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ProcessMonitorService"/> class.
@@ -45,67 +46,78 @@
             _state = state;
         }
 
+        /// <summary>
+        /// Executes background monitoring loop.
+        /// </summary>
+        /// <param name="stoppingToken">Cancellation token.</param>
+        /// <returns>Background task.</returns>
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-
-       
-
-
             while (!stoppingToken.IsCancellationRequested)
             {
                 try
                 {
-
-                    // 1. Wczytaj konfigurację
                     var configData = await File.ReadAllTextAsync("deviceconfiguration.json", stoppingToken);
-                    var deviceConfig = JsonSerializer.Deserialize<DynamicConfig>(configData);
-                    var cfg = deviceConfig.ProcessConfig;
+                    var deviceConfig = JsonSerializer.Deserialize<DynamicConfig>(configData)
+                        ?? throw new InvalidOperationException("Invalid deviceconfiguration.json.");
 
-                    // 2. LOGIKA CZASU STARTU (wstaw to tutaj, wewnątrz pętli)
+                    var cfg = deviceConfig.ProcessConfig
+                        ?? throw new InvalidOperationException("Missing ProcessConfig in configuration.");
+
                     if (_state.IsRecording && _state.ProcessStartTime == DateTime.MinValue)
                     {
-                        string fileName = _state.CurrentFileName;
-                        if (File.Exists(fileName))
-                        {
-                            // Jeśli plik istnieje, kontynuujemy czas od jego powstania
-                            _state.ProcessStartTime = File.GetCreationTime(fileName);
-                        }
-                        else
-                        {
-                            // Jeśli plik nie istnieje (nowy proces), ustawiamy start na teraz
-                            _state.ProcessStartTime = DateTime.Now;
-                        }
+                        var fileName = _state.CurrentFileName;
+                        _state.ProcessStartTime = File.Exists(fileName) ? File.GetCreationTime(fileName) : DateTime.Now;
                     }
 
-
-                    // 2. Odczyt temperatur (zawsze lokalne, więc szybkie)
                     var temps = new Dictionary<string, double>
-                        {
-                            { "Temp_Keg", _hardware.GetTemperature("Temp_Keg",deviceConfig.Devices.Termometers) + cfg.Calibrations.Temp_Keg },
-                            { "Temp_Bufor", _hardware.GetTemperature("Temp_Bufor",deviceConfig.Devices.Termometers) + cfg.Calibrations.Temp_Bufor },
-                            { "Temp_10p", _hardware.GetTemperature("Temp_10p",deviceConfig.Devices.Termometers) + cfg.Calibrations.Temp_10p },
-                            { "Temp_Glowica", _hardware.GetTemperature("Temp_Glowica",deviceConfig.Devices.Termometers) + cfg.Calibrations.Temp_Glowica },
-                            { "Temp_Woda", _hardware.GetTemperature("Temp_Woda",deviceConfig.Devices.Termometers) + cfg.Calibrations.Temp_Woda }
-                        };
+                    {
+                        { "Temp_Keg", _hardware.GetTemperature("Temp_Keg", deviceConfig.Devices.Termometers) + cfg.Calibrations.Temp_Keg },
+                        { "Temp_Bufor", _hardware.GetTemperature("Temp_Bufor", deviceConfig.Devices.Termometers) + cfg.Calibrations.Temp_Bufor },
+                        { "Temp_10p", _hardware.GetTemperature("Temp_10p", deviceConfig.Devices.Termometers) + cfg.Calibrations.Temp_10p },
+                        { "Temp_Glowica", _hardware.GetTemperature("Temp_Glowica", deviceConfig.Devices.Termometers) + cfg.Calibrations.Temp_Glowica },
+                        { "Temp_Woda", _hardware.GetTemperature("Temp_Woda", deviceConfig.Devices.Termometers) + cfg.Calibrations.Temp_Woda }
+                    };
 
-                    // 3. Sterowanie zaworem
-                    bool valveOpen = temps["Temp_10p"] > cfg.ValveThresholdTemp;
-                    _hardware.SetValve(valveOpen);
+                    _hardware.SetValve(temps["Temp_10p"] > cfg.ValveThresholdTemp);
 
-                    // 4. Odczyt Tuya tylko zgodnie z interwałem oszczędnym
+                    var powerMetrics = new Dictionary<string, PowerMetrics>(_cachedPowerMetrics, StringComparer.OrdinalIgnoreCase);
+
                     if ((DateTime.Now - _lastTuyaRefresh).TotalMilliseconds >= cfg.TuyaRefreshIntervalMs)
                     {
-                        var columnDeviceId = deviceConfig.Tuya?.Column?.DeviceId;
-
-                        if (!string.IsNullOrWhiteSpace(columnDeviceId))
+                        if (deviceConfig.Tuya is not null)
                         {
-                            _cachedPower = await _tuya.GetPowerMetricsAsync(columnDeviceId, stoppingToken);
+                            var tuyaSources = new Dictionary<string, TuyaDeviceConfig?>(StringComparer.OrdinalIgnoreCase)
+                            {
+                                ["Column"] = deviceConfig.Tuya?.Column,
+                                ["Pump"] = deviceConfig.Tuya?.Pump
+                            };
+
+                            foreach (var deviceEntry in tuyaSources)
+                            {
+                                var deviceName = deviceEntry.Key;
+                                var deviceId = deviceEntry.Value?.DeviceId;
+
+                                if (string.IsNullOrWhiteSpace(deviceId))
+                                {
+                                    continue;
+                                }
+
+                                try
+                                {
+                                    powerMetrics[deviceName] = await _tuya.GetPowerMetricsAsync(deviceId, stoppingToken);
+                                }
+                                catch (Exception ex)
+                                {
+                                    Console.WriteLine($"Tuya read failed for '{deviceName}': {ex.Message}");
+                                }
+                            }
                         }
 
+                        _cachedPowerMetrics = new Dictionary<string, PowerMetrics>(powerMetrics, StringComparer.OrdinalIgnoreCase);
                         _lastTuyaRefresh = DateTime.Now;
                     }
 
-                    // 3) W ExecuteAsync (obok odświeżania Tuya) dodaj odświeżanie pogody
                     if ((DateTime.Now - _lastWeatherRefresh) >= WeatherRefreshInterval)
                     {
                         try
@@ -115,53 +127,41 @@
                         }
                         catch (Exception ex)
                         {
-                            Console.WriteLine($"Błąd pobierania pogody: {ex.Message}");
+                            Console.WriteLine($"Weather read failed: {ex.Message}");
                         }
                     }
 
-                    // 5. Przygotowanie paczki danych (korzystamy z bufora _cachedPower)
+                    var mainPower =
+                        powerMetrics.TryGetValue("Column", out var columnPower) ? columnPower :
+                        powerMetrics.Values.FirstOrDefault() ??
+                        new PowerMetrics();
+
                     var payload = new ProcessLogPayload
                     {
                         Temperatures = temps,
-                        Power = _cachedPower,
+                        Power = mainPower,
+                        PowerByDevice = powerMetrics,
                         IsRecording = _state.IsRecording,
                         ProcessDuration = _state.IsRecording ? (DateTime.Now - _state.ProcessStartTime).ToString(@"hh\:mm\:ss") : "00:00:00",
                         FileName = _state.CurrentFileName,
                         StartTimeStr = _state.IsRecording ? _state.ProcessStartTime.ToString("yyyy-MM-dd HH:mm:ss") : "--:--:--",
-                        WeatherTemperatureC = _cachedWeather.TemperatureC,
-                        WeatherPressureHpa = _cachedWeather.PressureHpa
+                        WeatherTemperatureC = _cachedWeather?.TemperatureC ?? 0,
+                        WeatherPressureHpa = _cachedWeather?.PressureHpa ?? 0
                     };
-                    //ProcessLogPayload payload;
-                    //if (_state.IsRecording)
-                    //{
-                    //    // Jeśli nagrywamy, bierzemy dane z pliku (po zapisaniu nowej linii)
-                    //    payload = GetPayloadFromFile();
-                    //    // Uzupełniamy brakujące informacje o stanie
-                    //    payload.FileName = _state.CurrentFileName;
-                    //    payload.StartTimeStr = _state.ProcessStartTime.ToString("yyyy-MM-dd HH:mm:ss");
-                    //}
-                    //else
-                    //{
-                    //    // Jeśli nie nagrywamy, pokazujemy stan zerowy lub bieżący odczyt
-                    //    payload = new ProcessLogPayload { /* wypełnij zerami */ };
-                    //}
 
-                    // 6. Wypchnięcie danych na Dashboard (SignalR zawsze dostaje dane co DashboardRefreshIntervalMs)
                     await _hubContext.Clients.All.SendAsync("ReceiveProcessData", payload, stoppingToken);
 
-                    // 7. Zapis do pliku CSV (zależny od CsvLogIntervalMs)
                     if (_state.IsRecording && (DateTime.Now - _lastCsvLog).TotalMilliseconds >= cfg.CsvLogIntervalMs)
                     {
                         SaveToCsv(payload);
                         _lastCsvLog = DateTime.Now;
                     }
 
-                    // Czekamy tyle, ile wynosi interwał odświeżania dashboardu
                     await Task.Delay(cfg.DashboardRefreshIntervalMs, stoppingToken);
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Błąd w głównej pętli monitoringu: {ex.Message}");
+                    Console.WriteLine($"Error in monitoring loop: {ex.Message}");
                     await Task.Delay(5000, stoppingToken);
                 }
             }
@@ -237,10 +237,12 @@
                 string tempWoda = payload.Temperatures.GetValueOrDefault("Temp_Woda", 0).ToString("F1", culture);
 
                 // Formatowanie energii
-                string voltage = payload.Power.Voltage.ToString("F1", culture);
-                string current = payload.Power.Current.ToString("F2", culture);
-                string powerActive = payload.Power.Power.ToString("F1", culture);
-                string energy = payload.Power.SessionEnergy.ToString("F2", culture);
+                var power = payload.Power ?? new PowerMetrics();
+
+                string voltage = power.Voltage.ToString("F1", culture);
+                string current = power.Current.ToString("F2", culture);
+                string powerActive = power.Power.ToString("F1", culture);
+                string energy = power.SessionEnergy.ToString("F2", culture);
 
                 // Pobranie aktualnego komentarza ze wspólnego stanu!
                 string cleanComment = _state.CurrentComment?.Replace("\r", "").Replace("\n", " ").Replace(";", ",") ?? "";
@@ -324,11 +326,12 @@ private void EnsureCsvHeader(string fileName)
     {
         public Dictionary<string, double> Temperatures { get; set; }
         public PowerMetrics Power { get; set; }
-        public bool IsRecording { get; set; } 
+        public Dictionary<string, PowerMetrics> PowerByDevice { get; set; } = new();
+        public bool IsRecording { get; set; }
         public string ProcessDuration { get; set; }
         public string FileName { get; set; }
         public string StartTimeStr { get; set; }
-        public double WeatherTemperatureC { get; set; } // Nowe pole na temperaturę z pogody
-        public double WeatherPressureHpa { get; set; } // Nowe pole na ciśnienie z pogody
+        public double WeatherTemperatureC { get; set; }
+        public double WeatherPressureHpa { get; set; }
     }
 }
