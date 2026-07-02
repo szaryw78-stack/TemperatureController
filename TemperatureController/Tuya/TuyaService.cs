@@ -35,11 +35,16 @@ namespace TemperatureController.Tuya
         /// Gets current power metrics from Tuya device status.
         /// </summary>
         /// <returns>Mapped power metrics object.</returns>
-        public async Task<PowerMetrics> GetPowerMetricsAsync()
+        public async Task<PowerMetrics> GetPowerMetricsAsync(string deviceId, CancellationToken cancellationToken = default)
         {
+            if (string.IsNullOrWhiteSpace(deviceId))
+            {
+                throw new ArgumentException("Tuya deviceId is required.", nameof(deviceId));
+            }
+
             var token = await GetAccessTokenAsync();
 
-            var path = $"/v1.0/devices/{_options.DeviceId}/status";
+            var path = $"/v1.0/devices/{deviceId}/status";
             var timestamp = GetTimestampMs();
             var nonce = Guid.NewGuid().ToString("N");
             var sign = BuildSign("GET", path, timestamp, nonce, token);
@@ -52,10 +57,10 @@ namespace TemperatureController.Tuya
             request.Headers.Add("access_token", token);
             request.Headers.Add("nonce", nonce);
 
-            using var response = await _httpClient.SendAsync(request);
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
             response.EnsureSuccessStatusCode();
 
-            var raw = await response.Content.ReadAsStringAsync();
+            var raw = await response.Content.ReadAsStringAsync(cancellationToken);
             var dto = JsonSerializer.Deserialize<TuyaStatusResponse>(raw, _jsonOptions)
                       ?? throw new InvalidOperationException("Invalid Tuya status response.");
 
@@ -192,7 +197,6 @@ namespace TemperatureController.Tuya
         public string ApiEndpoint { get; set; } = string.Empty;
         public string ClientId { get; set; } = string.Empty;
         public string ClientSecret { get; set; } = string.Empty;
-        public string DeviceId { get; set; } = string.Empty;
     }
 
     internal sealed class TuyaTokenResponse

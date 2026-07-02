@@ -20,5 +20,15 @@
       "Temp_Glowica": "28-000000359337",
       "Temp_Woda": "28-000000359337"
     }
+  },
+  "Tuya": {
+    "Column": {
+      "DeviceId": "bff9d3d09377bff643mcxy",
+      "VisibleOnDashboard": true
+    },
+    "Pump": {
+      "DeviceId": "",
+      "VisibleOnDashboard": true
+    }
   }
 }

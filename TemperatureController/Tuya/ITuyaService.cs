@@ -2,7 +2,7 @@
 {
     public interface ITuyaService
     {
-        Task<PowerMetrics> GetPowerMetricsAsync();
+        Task<PowerMetrics> GetPowerMetricsAsync(string deviceId, CancellationToken cancellationToken = default);
     }
 
     public class PowerMetrics

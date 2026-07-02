@@ -95,9 +95,13 @@
                     // 4. Odczyt Tuya tylko zgodnie z interwałem oszczędnym
                     if ((DateTime.Now - _lastTuyaRefresh).TotalMilliseconds >= cfg.TuyaRefreshIntervalMs)
                     {
-                        _cachedPower = await _tuya.GetPowerMetricsAsync();
-                        // DODAJ TO:
-                     //   Console.WriteLine($"[DEBUG TUYA] Moc: {_cachedPower.Power}W, Napięcie: {_cachedPower.Voltage}V");
+                        var columnDeviceId = deviceConfig.Tuya?.Column?.DeviceId;
+
+                        if (!string.IsNullOrWhiteSpace(columnDeviceId))
+                        {
+                            _cachedPower = await _tuya.GetPowerMetricsAsync(columnDeviceId, stoppingToken);
+                        }
+
                         _lastTuyaRefresh = DateTime.Now;
                     }
 
