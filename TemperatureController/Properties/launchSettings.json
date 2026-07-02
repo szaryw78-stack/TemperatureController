@@ -17,6 +17,13 @@
       "applicationUrl": "https://localhost:7251;http://localhost:5148",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "RaspberryPi": {
+        "commandName": "RemoteDebugger",
+        "remoteDebugEnabled": true,
+        "remoteDebugMachine": "192.168.101.5",
+        "authenticationMode": "Password",
+        "workingDirectory": "/home/pi/temperaturecontroller/TemperatureController"
       }
     }
   }

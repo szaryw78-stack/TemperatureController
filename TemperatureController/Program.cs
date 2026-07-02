@@ -5,6 +5,7 @@ using TemperatureController.Tuya;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddSingleton<ProcessStateManager>();
+builder.Services.AddSingleton<HardwareService>();
 builder.Services.AddControllersWithViews();
 builder.Services.AddSignalR();
 

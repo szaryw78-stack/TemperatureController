@@ -14,11 +14,11 @@
   },
   "Devices": {
     "Termometers": {
-      "Temp_Keg": "28-00000xxxxxx1",
-      "Temp_Bufor": "28-00000xxxxxx2",
-      "Temp_10p": "28-00000xxxxxx3",
-      "Temp_Glowica": "28-00000xxxxxx4",
-      "Temp_Woda": "28-00000xxxxxx5"
+      "Temp_Keg": "28-000000359337",
+      "Temp_Bufor": "28-000000359337",
+      "Temp_10p": "28-000000359337",
+      "Temp_Glowica": "28-000000359337",
+      "Temp_Woda": "28-000000359337"
     }
   }
 }

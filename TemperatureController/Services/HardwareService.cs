@@ -1,99 +1,154 @@
-﻿namespace TemperatureController.Services
+﻿namespace TemperatureController.Services;
+
+using System;
+using System.Collections.Generic;
+using System.Device.Gpio;
+using System.Globalization;
+using System.IO;
+using Microsoft.Extensions.Configuration;
+
+public class HardwareService : IDisposable
 {
-    using System.Device.Gpio;
-    using System.IO;
+    private const int SsrPin = 17;
 
-    using System;
-    using System.Collections.Generic;
-    using System.Device.Gpio;
-    using System.IO;
-    using Microsoft.Extensions.Configuration;
+    private readonly GpioController? _gpio;
+    private readonly bool _useRaspberryPi;
+    private readonly Dictionary<string, string> _sensorMap;
+    private bool _disposed;
 
-    public class HardwareService
+    /// <summary>
+    /// Initializes a new instance of the <see cref="HardwareService"/> class.
+    /// </summary>
+    /// <param name="config">Application configuration source.</param>
+    public HardwareService(IConfiguration config)
     {
-        private const int SsrPin = 17;
-        private GpioController _gpio;
-        private readonly bool _useRaspberryPi;
-        private readonly Random _rand = new Random();
+        _useRaspberryPi = config.GetValue<bool>("Hardware:UseRaspberryPi", true);
+        _sensorMap = config.GetSection("Hardware:Sensors").Get<Dictionary<string, string>>()
+            ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-        private readonly Dictionary<string, string> _sensorMap = new();
-    //{
-    //    { "Temp_Keg", "28-00000xxxxxx1" },
-    //    { "Temp_Bufor", "28-00000xxxxxx2" },
-    //    { "Temp_10p", "28-00000xxxxxx3" },
-    //    { "Temp_Glowica", "28-00000xxxxxx4" },
-    //    { "Temp_Woda", "28-00000xxxxxx5" }
-    //};
-
-        public HardwareService(IConfiguration config)
+        if (!_useRaspberryPi)
         {
-            // Pobieramy z appsettings.json. Jeśli brak klucza, domyślnie zakładamy, że Malina jest (true)
-            _useRaspberryPi = config.GetValue<bool>("Hardware:UseRaspberryPi", true);
-
-            if (_useRaspberryPi)
-            {
-                try
-                {
-                    _gpio = new GpioController();
-                    _gpio.OpenPin(SsrPin, PinMode.Output);
-                    _gpio.Write(SsrPin, PinValue.Low);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Błąd inicjalizacji GPIO: {ex.Message}");
-                }
-            }
-            else
-            {
-                Console.WriteLine("Tryb symulacji sprzętu: Raspberry Pi wyłączone w appsettings.json");
-            }
+            Console.WriteLine("Simulation mode enabled: Raspberry Pi hardware access is disabled.");
+            return;
         }
 
-        public double GetTemperature(string sensorName, Dictionary<string, string> sensorMap)
+        try
         {
-            // Zwracamy symulowane wartości, aby dashboard i wykres żyły
-            if (!_useRaspberryPi)
-            {
-                // Zwraca losową temperaturę między 20.0 a 22.0, żeby było widać ruch na wykresie
-                return 20.0 + (_rand.NextDouble() * 2.0);
-            }
+            _gpio = new GpioController();
+            _gpio.OpenPin(SsrPin, PinMode.Output);
+            _gpio.Write(SsrPin, PinValue.Low);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"GPIO initialization error: {ex.Message}");
+        }
+    }
 
-            if (!_sensorMap.ContainsKey(sensorName)) return 0;
+    /// <summary>
+    /// Reads temperature from a DS18B20 sensor.
+    /// </summary>
+    /// <param name="sensorName">Logical sensor name.</param>
+    /// <param name="sensorMap">Optional runtime sensor map override.</param>
+    /// <returns>Temperature in Celsius; returns 0 when read fails.</returns>
+    public double GetTemperature(string sensorName, Dictionary<string, string> sensorMap)
+    {
+        if (!_useRaspberryPi)
+        {
+            // Simulation value for local testing.
+            return 20.0 + (Random.Shared.NextDouble() * 2.0);
+        }
 
-            string deviceId = _sensorMap[sensorName];
-            string path = $"/sys/bus/w1/devices/{deviceId}/w1_slave";
+        var effectiveMap = sensorMap?.Count > 0 ? sensorMap : _sensorMap;
 
-            if (!File.Exists(path)) return 0;
-
-            try
-            {
-                string[] lines = File.ReadAllLines(path);
-                if (lines.Length > 1 && lines[0].EndsWith("YES"))
-                {
-                    var tempStr = lines[1].Split("t=")[1];
-                    return double.Parse(tempStr) / 1000.0;
-                }
-            }
-            catch
-            {
-                return 0; // W razie błędu odczytu
-            }
-
+        if (!effectiveMap.TryGetValue(sensorName, out var deviceId) || string.IsNullOrWhiteSpace(deviceId))
+        {
             return 0;
         }
 
-        public void SetValve(bool open)
+        var path = $"/sys/bus/w1/devices/{deviceId}/w1_slave";
+        if (!File.Exists(path))
         {
-            if (!_useRaspberryPi || _gpio == null) return;
+            return 0;
+        }
 
-            try
+        try
+        {
+            var lines = File.ReadAllLines(path);
+            if (lines.Length < 2 || !lines[0].Contains("YES", StringComparison.OrdinalIgnoreCase))
             {
-                _gpio.Write(SsrPin, open ? PinValue.High : PinValue.Low);
+                return 0;
             }
-            catch (Exception ex)
+
+            var markerIndex = lines[1].IndexOf("t=", StringComparison.Ordinal);
+            if (markerIndex < 0)
             {
-                Console.WriteLine($"Błąd sterowania zaworem: {ex.Message}");
+                return 0;
+            }
+
+            var tempRaw = lines[1][(markerIndex + 2)..].Trim();
+            if (double.TryParse(tempRaw, NumberStyles.Float, CultureInfo.InvariantCulture, out var milliCelsius))
+            {
+                return milliCelsius / 1000.0;
             }
         }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Temperature read error for sensor '{sensorName}': {ex.Message}");
+        }
+
+        return 0;
+    }
+
+    /// <summary>
+    /// Opens or closes the valve (SSR output pin).
+    /// </summary>
+    /// <param name="open">True to open (HIGH), false to close (LOW).</param>
+    public void SetValve(bool open)
+    {
+        if (!_useRaspberryPi || _gpio is null)
+        {
+            return;
+        }
+
+        try
+        {
+            _gpio.Write(SsrPin, open ? PinValue.High : PinValue.Low);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Valve control error: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Releases GPIO resources.
+    /// </summary>
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        if (_gpio is not null)
+        {
+            try
+            {
+                if (_gpio.IsPinOpen(SsrPin))
+                {
+                    _gpio.Write(SsrPin, PinValue.Low);
+                    _gpio.ClosePin(SsrPin);
+                }
+
+                _gpio.Dispose();
+            }
+            catch
+            {
+                // Intentionally ignored during shutdown.
+            }
+        }
+
+        _disposed = true;
+        GC.SuppressFinalize(this);
     }
 }

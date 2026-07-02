@@ -479,11 +479,11 @@
 
         connection.on("ReceiveProcessData", function (data) {
             if (data.temperatures) {
-                document.getElementById('val_temp_keg').innerText = data.temperatures['Temp_Keg']?.toFixed(1) + " °C";
-                document.getElementById('val_temp_bufor').innerText = data.temperatures['Temp_Bufor']?.toFixed(1) + " °C";
-                document.getElementById('val_temp_10p').innerText = data.temperatures['Temp_10p']?.toFixed(1) + " °C";
-                document.getElementById('val_temp_glowica').innerText = data.temperatures['Temp_Glowica']?.toFixed(1) + " °C";
-                document.getElementById('val_temp_woda').innerText = data.temperatures['Temp_Woda']?.toFixed(1) + " °C";
+                document.getElementById('val_temp_keg').innerText = data.temperatures['Temp_Keg']?.toFixed(2) + " °C";
+                document.getElementById('val_temp_bufor').innerText = data.temperatures['Temp_Bufor']?.toFixed(2) + " °C";
+                document.getElementById('val_temp_10p').innerText = data.temperatures['Temp_10p']?.toFixed(2) + " °C";
+                document.getElementById('val_temp_glowica').innerText = data.temperatures['Temp_Glowica']?.toFixed(2) + " °C";
+                document.getElementById('val_temp_woda').innerText = data.temperatures['Temp_Woda']?.toFixed(2) + " °C";
             }
 
             if (data.power) {
