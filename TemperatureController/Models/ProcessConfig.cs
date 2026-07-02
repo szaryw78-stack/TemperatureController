@@ -7,5 +7,8 @@ namespace TemperatureController.Models
         public double ValveThresholdTemp { get; set; }
         public Calibrations Calibrations { get; set; } = new();
         public int TuyaRefreshIntervalMs { get; set; }
+        // Nowe parametry zarządzania procesem
+        public double CoolingWaterStart { get; set; }
+        public double EmergencyStop { get; set; }
     }
 }

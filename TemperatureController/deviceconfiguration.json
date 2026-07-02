@@ -1,8 +1,8 @@
 {
   "ProcessConfig": {
-    "DashboardRefreshIntervalMs": 5000,
-    "CsvLogIntervalMs": 6000,
-    "ValveThresholdTemp": 78.3,
+    "DashboardRefreshIntervalMs": 5001,
+    "CsvLogIntervalMs": 6002,
+    "ValveThresholdTemp": 80,
     "Calibrations": {
       "Temp_Keg": 2.7,
       "Temp_Bufor": 1.2,
@@ -10,15 +10,32 @@
       "Temp_Glowica": 2.45,
       "Temp_Woda": 1.5
     },
-    "TuyaRefreshIntervalMs": 6000
+    "TuyaRefreshIntervalMs": 6003,
+    "CoolingWaterStart": 25,
+    "EmergencyStop": 35
   },
   "Devices": {
     "Termometers": {
-      "Temp_Keg": "28-000000359337",
-      "Temp_Bufor": "28-000000359337",
-      "Temp_10p": "28-000000359337",
-      "Temp_Glowica": "28-000000359337",
-      "Temp_Woda": "28-000000359337"
+      "Temp_Keg": {
+        "DeviceId": "28-000000359337",
+        "VisibleOnDashboard": true
+      },
+      "Temp_Bufor": {
+        "DeviceId": "28-000000359337",
+        "VisibleOnDashboard": true
+      },
+      "Temp_10p": {
+        "DeviceId": "28-000000359337",
+        "VisibleOnDashboard": true
+      },
+      "Temp_Glowica": {
+        "DeviceId": "28-000000359337",
+        "VisibleOnDashboard": true
+      },
+      "Temp_Woda": {
+        "DeviceId": "28-000000359337",
+        "VisibleOnDashboard": true
+      }
     }
   },
   "Tuya": {

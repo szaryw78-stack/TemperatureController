@@ -1,0 +1,234 @@
+﻿@model TemperatureController.Models.ProcessSettingsViewModel
+
+@{
+    ViewData["Title"] = "Ustawienia Procesu";
+}
+
+<style>
+    :root {
+        --fiori-bg: #F2F4F7;
+        --fiori-card-bg: #FFFFFF;
+        --fiori-text: #32363A;
+        --fiori-blue: #0A6ED1;
+        --fiori-border: #D9D9D9;
+        --fiori-green: #256F3A;
+        --fiori-red: #BB0000;
+    }
+
+    body {
+        background-color: var(--fiori-bg);
+        color: var(--fiori-text);
+        font-family: "72", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    }
+
+    .app-header {
+        background-color: var(--fiori-blue);
+        color: white;
+        padding: 10px 20px;
+        font-size: 18px;
+        font-weight: bold;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+    }
+
+    .fiori-card {
+        background-color: var(--fiori-card-bg);
+        border: 1px solid var(--fiori-border);
+        border-radius: 4px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+
+    .fiori-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 15px;
+    }
+
+    .fiori-table th, .fiori-table td {
+        padding: 10px;
+        border-bottom: 1px solid var(--fiori-border);
+        text-align: left;
+    }
+
+    .fiori-table input[type="text"] {
+        width: 100%;
+        padding: 6px;
+        border: 1px solid var(--fiori-border);
+        border-radius: 4px;
+    }
+
+    .param-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 15px;
+    }
+
+    .form-group { display: flex; flex-direction: column; }
+    .form-group label { margin-bottom: 5px; font-weight: bold; color: #666; font-size: 13px; }
+    .form-group input { padding: 8px; border: 1px solid var(--fiori-border); border-radius: 4px; font-size: 14px;}
+
+    .btn { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; color: white; transition: 0.2s;}
+    .btn-add { background-color: var(--fiori-blue); }
+    .btn-add:hover { background-color: #0854a0; }
+    .btn-del { background-color: var(--fiori-red); padding: 6px 12px; font-size: 12px;}
+    .btn-save { background-color: var(--fiori-green); font-size: 18px; width: 100%; padding: 15px;}
+    .btn-save:hover { background-color: #1e5a2f; }
+</style>
+
+<div class="app-header">
+    &nbsp;&nbsp;&nbsp; Ustawienia Procesu
+</div>
+
+<div class="container" style="max-width: 1200px; margin: 0 auto; padding-bottom: 50px;">
+    
+    <div class="fiori-card">
+        <h3 style="margin-top:0; color: var(--fiori-blue);">Główne Parametry (ProcessConfig)</h3>
+        <div class="param-grid">
+            <div class="form-group">
+                <label>Dashboard Refresh Interval (ms)</label>
+                <input type="number" id="pc_DashboardRefresh" value="@Model.ProcessConfig.DashboardRefreshIntervalMs" />
+            </div>
+            <div class="form-group">
+                <label>CSV Log Interval (ms)</label>
+                <input type="number" id="pc_CsvLog" value="@Model.ProcessConfig.CsvLogIntervalMs" />
+            </div>
+            <div class="form-group">
+                <label>Tuya Refresh Interval (ms)</label>
+                <input type="number" id="pc_TuyaRefresh" value="@Model.ProcessConfig.TuyaRefreshIntervalMs" />
+            </div>
+            <div class="form-group">
+                <label>Valve Threshold Temp (°C)</label>
+                <input type="number" step="0.1" id="pc_ValveTemp" value="@Model.ProcessConfig.ValveThresholdTemp" />
+            </div>
+            <div class="form-group">
+                <label>Cooling Water Start (°C)</label>
+                <input type="number" step="0.1" id="pc_CoolingWater" value="@Model.ProcessConfig.CoolingWaterStart" />
+            </div>
+            <div class="form-group">
+                <label>Emergency Stop (°C)</label>
+                <input type="number" step="0.1" id="pc_EmergencyStop" value="@Model.ProcessConfig.EmergencyStop" />
+            </div>
+        </div>
+    </div>
+
+    <div class="fiori-card">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="margin:0; color: var(--fiori-blue);">Termometry (1-Wire)</h3>
+            <button class="btn btn-add" onclick="addRow('termometers-list')">+ Dodaj Termometr</button>
+        </div>
+        <table class="fiori-table" id="termometers-list">
+            <thead>
+                <tr>
+                    <th>Nazwa Urządzenia (Key)</th>
+                    <th>Device ID (Sonda)</th>
+                    <th style="width: 120px; text-align:center;">Widoczny</th>
+                    <th style="width: 80px;">Akcja</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach(var t in Model.Termometers)
+                {
+                    <tr>
+                        <td><input type="text" class="dev-name" value="@t.Key" /></td>
+                        <td><input type="text" class="dev-id" value="@t.Value.DeviceId" /></td>
+                        <td style="text-align:center;"><input type="checkbox" class="dev-vis" @(t.Value.VisibleOnDashboard ? "checked" : "") /></td>
+                        <td><button class="btn btn-del" onclick="this.closest('tr').remove()">Usuń</button></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <div class="fiori-card">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="margin:0; color: var(--fiori-blue);">Urządzenia Tuya</h3>
+            <button class="btn btn-add" onclick="addRow('tuya-list')">+ Dodaj Tuya</button>
+        </div>
+        <table class="fiori-table" id="tuya-list">
+            <thead>
+                <tr>
+                    <th>Nazwa Urządzenia (Key)</th>
+                    <th>Device ID (Tuya)</th>
+                    <th style="width: 120px; text-align:center;">Widoczny</th>
+                    <th style="width: 80px;">Akcja</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach(var t in Model.Tuya)
+                {
+                    <tr>
+                        <td><input type="text" class="dev-name" value="@t.Key" /></td>
+                        <td><input type="text" class="dev-id" value="@t.Value.DeviceId" /></td>
+                        <td style="text-align:center;"><input type="checkbox" class="dev-vis" @(t.Value.VisibleOnDashboard ? "checked" : "") /></td>
+                        <td><button class="btn btn-del" onclick="this.closest('tr').remove()">Usuń</button></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <button class="btn btn-save" onclick="saveSettings()">ZAPISZ WSZYSTKIE USTAWIENIA</button>
+</div>
+
+<script>
+    function addRow(tableId) {
+        const tbody = document.querySelector(`#${tableId} tbody`);
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><input type="text" class="dev-name" placeholder="Wpisz nazwę (np. Temp_X)" /></td>
+            <td><input type="text" class="dev-id" placeholder="Wpisz Device ID" /></td>
+            <td style="text-align:center;"><input type="checkbox" class="dev-vis" checked /></td>
+            <td><button class="btn btn-del" onclick="this.closest('tr').remove()">Usuń</button></td>
+        `;
+        tbody.appendChild(tr);
+    }
+
+    function collectTableData(tableId) {
+        const data = {};
+        document.querySelectorAll(`#${tableId} tbody tr`).forEach(tr => {
+            const name = tr.querySelector('.dev-name').value.trim();
+            const id = tr.querySelector('.dev-id').value.trim();
+            const vis = tr.querySelector('.dev-vis').checked;
+            
+            if (name && id) {
+                data[name] = { DeviceId: id, VisibleOnDashboard: vis };
+            }
+        });
+        return data;
+    }
+
+    async function saveSettings() {
+        const payload = {
+            ProcessConfig: {
+                DashboardRefreshIntervalMs: parseInt(document.getElementById('pc_DashboardRefresh').value) || 5000,
+                CsvLogIntervalMs: parseInt(document.getElementById('pc_CsvLog').value) || 6000,
+                TuyaRefreshIntervalMs: parseInt(document.getElementById('pc_TuyaRefresh').value) || 6000,
+                ValveThresholdTemp: parseFloat(document.getElementById('pc_ValveTemp').value.replace(',','.')) || 78.0,
+                CoolingWaterStart: parseFloat(document.getElementById('pc_CoolingWater').value.replace(',','.')) || 0,
+                EmergencyStop: parseFloat(document.getElementById('pc_EmergencyStop').value.replace(',','.')) || 0
+            },
+            Termometers: collectTableData('termometers-list'),
+            Tuya: collectTableData('tuya-list')
+        };
+
+        try {
+            const response = await fetch('/ProcessSettings/Save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (response.ok) {
+                alert('Zapisano ustawienia poprawnie!');
+                window.location.reload();
+            } else {
+                alert('Wystąpił błąd podczas zapisu.');
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Błąd połączenia z serwerem.');
+        }
+    }
+</script>

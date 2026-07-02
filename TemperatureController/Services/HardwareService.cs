@@ -1,11 +1,12 @@
 ﻿namespace TemperatureController.Services;
 
+using Microsoft.Extensions.Configuration;
 using System;
 using System.Collections.Generic;
 using System.Device.Gpio;
 using System.Globalization;
 using System.IO;
-using Microsoft.Extensions.Configuration;
+using TemperatureController.Models;
 
 public class HardwareService : IDisposable
 {
@@ -50,53 +51,89 @@ public class HardwareService : IDisposable
     /// <param name="sensorName">Logical sensor name.</param>
     /// <param name="sensorMap">Optional runtime sensor map override.</param>
     /// <returns>Temperature in Celsius; returns 0 when read fails.</returns>
-    public double GetTemperature(string sensorName, Dictionary<string, string> sensorMap)
+    //public double GetTemperature(string sensorName, Dictionary<string, string> sensorMap)
+    //{
+    //    if (!_useRaspberryPi)
+    //    {
+    //        // Simulation value for local testing.
+    //        return 20.0 + (Random.Shared.NextDouble() * 2.0);
+    //    }
+
+    //    var effectiveMap = sensorMap?.Count > 0 ? sensorMap : _sensorMap;
+
+    //    if (!effectiveMap.TryGetValue(sensorName, out var deviceId) || string.IsNullOrWhiteSpace(deviceId))
+    //    {
+    //        return 0;
+    //    }
+
+    //    var path = $"/sys/bus/w1/devices/{deviceId}/w1_slave";
+    //    if (!File.Exists(path))
+    //    {
+    //        return 0;
+    //    }
+
+    //    try
+    //    {
+    //        var lines = File.ReadAllLines(path);
+    //        if (lines.Length < 2 || !lines[0].Contains("YES", StringComparison.OrdinalIgnoreCase))
+    //        {
+    //            return 0;
+    //        }
+
+    //        var markerIndex = lines[1].IndexOf("t=", StringComparison.Ordinal);
+    //        if (markerIndex < 0)
+    //        {
+    //            return 0;
+    //        }
+
+    //        var tempRaw = lines[1][(markerIndex + 2)..].Trim();
+    //        if (double.TryParse(tempRaw, NumberStyles.Float, CultureInfo.InvariantCulture, out var milliCelsius))
+    //        {
+    //            return milliCelsius / 1000.0;
+    //        }
+    //    }
+    //    catch (Exception ex)
+    //    {
+    //        Console.WriteLine($"Temperature read error for sensor '{sensorName}': {ex.Message}");
+    //    }
+
+    //    return 0;
+    //}
+    public double GetTemperature(string sensorName, Dictionary<string, DeviceItemConfig> termometersConfig)
     {
-        if (!_useRaspberryPi)
-        {
-            // Simulation value for local testing.
-            return 20.0 + (Random.Shared.NextDouble() * 2.0);
-        }
-
-        var effectiveMap = sensorMap?.Count > 0 ? sensorMap : _sensorMap;
-
-        if (!effectiveMap.TryGetValue(sensorName, out var deviceId) || string.IsNullOrWhiteSpace(deviceId))
-        {
-            return 0;
-        }
-
-        var path = $"/sys/bus/w1/devices/{deviceId}/w1_slave";
-        if (!File.Exists(path))
-        {
-            return 0;
-        }
-
         try
         {
-            var lines = File.ReadAllLines(path);
-            if (lines.Length < 2 || !lines[0].Contains("YES", StringComparison.OrdinalIgnoreCase))
+            // Pobieramy obiekt z nowego modelu i wyciągamy z niego DeviceId
+            if (termometersConfig != null &&
+                termometersConfig.TryGetValue(sensorName, out var config) &&
+                !string.IsNullOrEmpty(config.DeviceId))
             {
-                return 0;
-            }
+                string deviceId = config.DeviceId;
+                string filePath = $"/sys/bus/w1/devices/{deviceId}/w1_slave";
 
-            var markerIndex = lines[1].IndexOf("t=", StringComparison.Ordinal);
-            if (markerIndex < 0)
-            {
-                return 0;
-            }
-
-            var tempRaw = lines[1][(markerIndex + 2)..].Trim();
-            if (double.TryParse(tempRaw, NumberStyles.Float, CultureInfo.InvariantCulture, out var milliCelsius))
-            {
-                return milliCelsius / 1000.0;
+                if (System.IO.File.Exists(filePath))
+                {
+                    string[] lines = System.IO.File.ReadAllLines(filePath);
+                    if (lines.Length >= 2 && lines[0].Contains("YES"))
+                    {
+                        int tIndex = lines[1].IndexOf("t=");
+                        if (tIndex != -1)
+                        {
+                            string tempStr = lines[1].Substring(tIndex + 2);
+                            if (double.TryParse(tempStr, out double temp))
+                            {
+                                return temp / 1000.0;
+                            }
+                        }
+                    }
+                }
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Temperature read error for sensor '{sensorName}': {ex.Message}");
+            Console.WriteLine($"Błąd odczytu z czujnika {sensorName}: {ex.Message}");
         }
-
-        return 0;
+        return 0.0;
     }
 
     /// <summary>

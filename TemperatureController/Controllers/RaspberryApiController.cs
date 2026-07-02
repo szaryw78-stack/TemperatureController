@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using Microsoft.AspNetCore.Mvc;
+using TemperatureController.Models;
 using TemperatureController.Services;
 
 namespace TemperatureController.Controllers
@@ -29,7 +30,9 @@ namespace TemperatureController.Controllers
         public IActionResult GetSystemStatus([FromQuery] string sensorName = "Boiler")
         {
             // Empty override map -> HardwareService falls back to configured Hardware:Sensors map.
-            var temperature = _hardwareService.GetTemperature(sensorName, new Dictionary<string, string>());
+            var temperature = _hardwareService.GetTemperature(
+                sensorName,
+                new Dictionary<string, DeviceItemConfig>());
 
             return Ok(new
             {

@@ -87,10 +87,10 @@
                     {
                         if (deviceConfig.Tuya is not null)
                         {
-                            var tuyaSources = new Dictionary<string, TuyaDeviceConfig?>(StringComparer.OrdinalIgnoreCase)
+                            var tuyaSources = new Dictionary<string, DeviceItemConfig?>(StringComparer.OrdinalIgnoreCase)
                             {
-                                ["Column"] = deviceConfig.Tuya?.Column,
-                                ["Pump"] = deviceConfig.Tuya?.Pump
+                                ["Column"] = deviceConfig.Tuya.GetValueOrDefault("Column"),
+                                ["Pump"] = deviceConfig.Tuya.GetValueOrDefault("Pump")
                             };
 
                             foreach (var deviceEntry in tuyaSources)
@@ -324,13 +324,13 @@ private void EnsureCsvHeader(string fileName)
     }
     public class ProcessLogPayload
     {
-        public Dictionary<string, double> Temperatures { get; set; }
-        public PowerMetrics Power { get; set; }
+        public Dictionary<string, double> Temperatures { get; set; } = new();
+        public PowerMetrics Power { get; set; } = new();
         public Dictionary<string, PowerMetrics> PowerByDevice { get; set; } = new();
         public bool IsRecording { get; set; }
-        public string ProcessDuration { get; set; }
-        public string FileName { get; set; }
-        public string StartTimeStr { get; set; }
+        public string ProcessDuration { get; set; } = "00:00:00";
+        public string FileName { get; set; } = string.Empty;
+        public string StartTimeStr { get; set; } = "--:--:--";
         public double WeatherTemperatureC { get; set; }
         public double WeatherPressureHpa { get; set; }
     }
