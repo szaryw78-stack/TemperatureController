@@ -665,9 +665,7 @@
 
             // START TIME + DURATION
             document.getElementById('ui_duration').innerText = data.processDuration || "00:00:00";
-            document.getElementById('ui_startTime').innerText = data.isRecording
-                ? (data.startTimeStr || "--:--:--")
-                : "--:--:--";
+            document.getElementById('ui_startTime').innerText = data.startTimeStr || "--:--:--";
 
             isRecording = !!data.isRecording;
             setToggleButtonState();

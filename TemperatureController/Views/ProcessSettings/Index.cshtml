@@ -87,32 +87,36 @@
         <h3 style="margin-top:0; color: var(--fiori-blue);">Główne Parametry (ProcessConfig)</h3>
         <div class="param-grid">
             <div class="form-group">
-                <label>Dashboard Refresh Interval (ms)</label>
+                <label>Odświeżanie Dashboard  (ms)</label>
                 <input type="number" id="pc_DashboardRefresh" value="@Model.ProcessConfig.DashboardRefreshIntervalMs" />
             </div>
             <div class="form-group">
-                <label>CSV Log Interval (ms)</label>
+                <label>Interwał zapisu do logu CSV (ms)</label>
                 <input type="number" id="pc_CsvLog" value="@Model.ProcessConfig.CsvLogIntervalMs" />
             </div>
             <div class="form-group">
-                <label>Tuya Refresh Interval (ms)</label>
+                <label> Pobieranie danych z Tuya (ms)</label>
                 <input type="number" id="pc_TuyaRefresh" value="@Model.ProcessConfig.TuyaRefreshIntervalMs" />
             </div>
             <div class="form-group">    
-                <label>Valve Threshold Temp max (°C)</label>
-                <input type="number" step="0.1" id="pc_ValveTempMax" value="@Model.ProcessConfig.ValveThresholdTempMax" />
+                <label>Temperatura wyłączenia zaworu (°C)</label>
+                <input type="number" step="0.02" id="pc_ValveTempMax"
+                       value="@Model.ProcessConfig.ValveThresholdTempMax.ToString(System.Globalization.CultureInfo.InvariantCulture)" />
             </div>
              <div class="form-group">
-                <label>Valve Threshold Temp min (°C)</label>
-                <input type="number" step="0.1" id="pc_ValveTempMin" value="@Model.ProcessConfig.ValveThresholdTempMin" />
+                <label>Temperatura dnia (°C)</label>
+                <input type="number" step="0.02" id="pc_ValveTempMin"
+                       value="@Model.ProcessConfig.ValveThresholdTempMin.ToString(System.Globalization.CultureInfo.InvariantCulture)" />
             </div>
             <div class="form-group">
-                <label>Cooling Water Start (°C)</label>
-                <input type="number" step="0.1" id="pc_CoolingWater" value="@Model.ProcessConfig.CoolingWaterStart" />
+                <label>Start wody (°C)</label>
+                <input type="number" step="0.1" id="pc_CoolingWater"
+                       value="@Model.ProcessConfig.CoolingWaterStart.ToString(System.Globalization.CultureInfo.InvariantCulture)" />
             </div>
             <div class="form-group">
-                <label>Emergency Stop (°C)</label>
-                <input type="number" step="0.1" id="pc_EmergencyStop" value="@Model.ProcessConfig.EmergencyStop" />
+                <label>Zatrzymanie awaryjne kolumny (°C)</label>
+                <input type="number" step="0.1" id="pc_EmergencyStop"
+                       value="@Model.ProcessConfig.EmergencyStop.ToString(System.Globalization.CultureInfo.InvariantCulture)" />
             </div>
         </div>
     </div>
@@ -209,9 +213,10 @@
                 DashboardRefreshIntervalMs: parseInt(document.getElementById('pc_DashboardRefresh').value) || 5000,
                 CsvLogIntervalMs: parseInt(document.getElementById('pc_CsvLog').value) || 6000,
                 TuyaRefreshIntervalMs: parseInt(document.getElementById('pc_TuyaRefresh').value) || 6000,
-                ValveThresholdTemp: parseFloat(document.getElementById('pc_ValveTemp').value.replace(',','.')) || 78.0,
-                CoolingWaterStart: parseFloat(document.getElementById('pc_CoolingWater').value.replace(',','.')) || 0,
-                EmergencyStop: parseFloat(document.getElementById('pc_EmergencyStop').value.replace(',','.')) || 0
+                ValveThresholdTempMin: parseFloat(document.getElementById('pc_ValveTempMin').value.replace(',', '.')) || 78.0,
+                ValveThresholdTempMax: parseFloat(document.getElementById('pc_ValveTempMax').value.replace(',', '.')) || 78.5,
+                CoolingWaterStart: parseFloat(document.getElementById('pc_CoolingWater').value.replace(',', '.')) || 0,
+                EmergencyStop: parseFloat(document.getElementById('pc_EmergencyStop').value.replace(',', '.')) || 0
             },
             Termometers: collectTableData('termometers-list'),
             Tuya: collectTableData('tuya-list')

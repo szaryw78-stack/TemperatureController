@@ -40,7 +40,16 @@
         {
             lock (_sync)
             {
-                IsRecording = !IsRecording;
+                if (!IsRecording)
+                {
+                    IsRecording = true;
+                    ProcessStartTime = DateTime.Now;
+                }
+                else
+                {
+                    IsRecording = false;
+                }
+
                 return IsRecording;
             }
         }
