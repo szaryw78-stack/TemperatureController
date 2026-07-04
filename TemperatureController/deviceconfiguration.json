@@ -17,23 +17,23 @@
   "Devices": {
     "Termometers": {
       "Temp_Keg": {
-        "DeviceId": "28-000000359337",
+        "DeviceId": "28-0624c0eebf89",
         "VisibleOnDashboard": true
       },
       "Temp_Bufor": {
-        "DeviceId": "28-000000359337",
+        "DeviceId": "28-0624c0f622f4",
         "VisibleOnDashboard": true
       },
       "Temp_10p": {
-        "DeviceId": "28-000000359337",
+        "DeviceId": "28-000000230e01",
         "VisibleOnDashboard": true
       },
       "Temp_Glowica": {
-        "DeviceId": "28-000000359337",
+        "DeviceId": "28-0b2551ca3dc5",
         "VisibleOnDashboard": true
       },
       "Temp_Woda": {
-        "DeviceId": "28-000000359337",
+        "DeviceId": "28-09239b92a007",
         "VisibleOnDashboard": true
       }
     }
