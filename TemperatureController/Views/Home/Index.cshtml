@@ -86,7 +86,7 @@
 
         .valve-status {
             font-weight: bold;
-            font-size: 18px;
+            font-size: 158px;
             color: var(--fiori-green);
         }
 
@@ -208,6 +208,32 @@
         padding: 7px 6px;
         background: #f8f8f8;
     }
+
+    .range-indicator {
+        display: inline-block;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        border: 1px solid #999;
+        vertical-align: middle;
+    }
+
+    .range-ok { background-color: var(--fiori-green); }
+    .range-out { background-color: var(--fiori-red); }
+
+    .status-lamp {
+        display: inline-block;
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        border: 1px solid #888;
+        margin-right: 8px;
+        vertical-align: middle;
+        background-color: #bbb;
+    }
+
+    .status-lamp-green { background-color: var(--fiori-green); }
+    .status-lamp-red { background-color: var(--fiori-red); }
     </style>
 </head>
 <body>
@@ -226,14 +252,15 @@
                     <span>Czas trwania: <b id="ui_duration">00:00:00</b></span>
                 </div>
                 <div class="control-item">
-                    @* <span id="ui_valveStatus" class="valve-status">[ 230V - OFF ]</span>
-                    <button id="btn_processToggle" class="btn btn-start" onclick="toggleProcess()">START PROCESU</button> *@
-                    <span id="ui_valveStatus" class="valve-status">[ 230V - OFF ]</span>
+                    <span id="valve_range_lamp" class="status-lamp status-lamp-red"></span>
+                    <span>e-ARC <b id="valve_range_text">WYŁĄCZONY</b></span>
+                </div>
+                <div class="control-item">
+                   @*  <span id="ui_valveStatus" class="valve-status">[ 230V - OFF ]</span> *@
                     <button id="btn_processToggle" class="btn btn-start" onclick="toggleProcess()">
                         <span id="btn_spinner" class="spinner d-none"></span>
                         <span id="btn_text">START PROCESU</span>
                     </button>
-
                 </div>
             </div>
             <div class="control-row" style="justify-content: flex-start; gap: 20px;">
@@ -661,6 +688,14 @@
             }
 
             processChart.update();
+
+            const lamp = document.getElementById('valve_range_lamp');
+            const text = document.getElementById('valve_range_text');
+            const inRange = !!data.isValveEnabled; // temp10p pomiędzy ValveThresholdTempMin i ValveThresholdTempMax
+
+            lamp.classList.remove('status-lamp-green', 'status-lamp-red');
+            lamp.classList.add(inRange ? 'status-lamp-green' : 'status-lamp-red');
+            text.innerText = inRange ? "ZAŁĄCZONY" : "WYŁĄCZONY";
         });
 
         /// 1) Dociąganie korekt z pliku konfiguracyjnego

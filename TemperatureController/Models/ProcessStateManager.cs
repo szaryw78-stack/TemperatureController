@@ -8,6 +8,7 @@
         public DateTime ProcessStartTime { get; set; }
         public string CurrentComment { get; set; } = "";
         public string CurrentFileName { get; set; } = "Log_Procesu.csv";
+        public bool IsValveOpen { get; set; } = false;
 
         /// <summary>
         /// Starts recording process.

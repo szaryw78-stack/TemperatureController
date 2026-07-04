@@ -98,9 +98,13 @@
                 <label>Tuya Refresh Interval (ms)</label>
                 <input type="number" id="pc_TuyaRefresh" value="@Model.ProcessConfig.TuyaRefreshIntervalMs" />
             </div>
-            <div class="form-group">
-                <label>Valve Threshold Temp (°C)</label>
-                <input type="number" step="0.1" id="pc_ValveTemp" value="@Model.ProcessConfig.ValveThresholdTemp" />
+            <div class="form-group">    
+                <label>Valve Threshold Temp max (°C)</label>
+                <input type="number" step="0.1" id="pc_ValveTempMax" value="@Model.ProcessConfig.ValveThresholdTempMax" />
+            </div>
+             <div class="form-group">
+                <label>Valve Threshold Temp min (°C)</label>
+                <input type="number" step="0.1" id="pc_ValveTempMin" value="@Model.ProcessConfig.ValveThresholdTempMin" />
             </div>
             <div class="form-group">
                 <label>Cooling Water Start (°C)</label>

@@ -2,13 +2,14 @@
   "ProcessConfig": {
     "DashboardRefreshIntervalMs": 5001,
     "CsvLogIntervalMs": 6002,
-    "ValveThresholdTemp": 80,
+    "ValveThresholdTempMin": 78.05,
+    "ValveThresholdTempMax": 78.5,
     "Calibrations": {
-      "Temp_Keg": 2.7,
-      "Temp_Bufor": 1.2,
-      "Temp_10p": 2.2,
-      "Temp_Glowica": 2.45,
-      "Temp_Woda": 1.5
+      "Temp_Keg": -0.05,
+      "Temp_Bufor": -0.5,
+      "Temp_10p": 0.15,
+      "Temp_Glowica": 0.05,
+      "Temp_Woda": 0.05
     },
     "TuyaRefreshIntervalMs": 6003,
     "CoolingWaterStart": 25,
