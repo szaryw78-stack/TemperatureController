@@ -9,7 +9,6 @@ builder.Services.AddSingleton<HardwareService>();
 builder.Services.AddControllersWithViews();
 builder.Services.AddSignalR();
 
-builder.Services.AddSingleton<HardwareService>();
 builder.Services.Configure<TuyaOptions>(builder.Configuration.GetSection("Tuya"));
 builder.Services.AddHttpClient<ITuyaService, TuyaService>();
 builder.Services.AddHostedService<ProcessMonitorService>();
