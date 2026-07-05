@@ -4,6 +4,11 @@ using TemperatureController.Tuya;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// DODAJ TO:
+builder.Configuration
+    .SetBasePath(AppDomain.CurrentDomain.BaseDirectory)
+    .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
+
 builder.Services.AddSingleton<ProcessStateManager>();
 builder.Services.AddSingleton<HardwareService>();
 builder.Services.AddControllersWithViews();

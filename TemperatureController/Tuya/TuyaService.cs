@@ -25,6 +25,13 @@ namespace TemperatureController.Tuya
         /// <param name="options">Tuya API settings from configuration.</param>
         public TuyaService(HttpClient httpClient, IOptions<TuyaOptions> options)
         {
+            ///
+            var url = options.Value.ApiEndpoint;
+            if (string.IsNullOrWhiteSpace(url))
+            {
+                throw new Exception("BŁĄD: ApiEndpoint w TuyaOptions jest pusty! Sprawdź appsettings.json");
+            }
+            ///
             _httpClient = httpClient;
             _options = options.Value;
 
