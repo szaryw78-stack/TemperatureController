@@ -4,7 +4,7 @@
     "CsvLogIntervalSec": 6,
     "ValveThresholdTempMin": 29,
     "ValveThresholdTempMax": 35,
-    "HeartbeatReceptionEnabled": true,
+    "HeartbeatReceptionEnabled": false,
     "Calibrations": {
       "Temp_Keg": 0,
       "Temp_Bufor": 0,
@@ -13,7 +13,7 @@
       "Temp_Woda": 0
     },
     "TuyaRefreshIntervalSec": 5,
-    "CoolingWaterStart": 29,
+    "CoolingWaterStart": 20,
     "EmergencyStop": 80
   },
   "Devices": {

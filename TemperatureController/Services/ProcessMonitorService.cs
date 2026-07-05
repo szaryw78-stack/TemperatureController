@@ -26,6 +26,9 @@
             "Napiecie_V;Prad_A;Moc_W;Zuzycie_Wh;Temp_Zewn_C;Cisnienie_hPa;Zawor;Komentarz";
         private Dictionary<string, PowerMetrics> _cachedPowerMetrics = new(StringComparer.OrdinalIgnoreCase);
 
+        // ADD: command edge guard (send ON once per threshold crossing)
+        private bool _pumpOnCommandSent;
+
         /// <summary>
         /// Initializes a new instance of the <see cref="ProcessMonitorService"/> class.
         /// </summary>
@@ -56,126 +59,175 @@
         /// </summary>
         /// <param name="stoppingToken">Cancellation token.</param>
         /// <returns>Background task.</returns>
-                        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        {
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                try
+                {
+                    var configData = await File.ReadAllTextAsync(_configFilePath, stoppingToken);
+                    var deviceConfig = JsonSerializer.Deserialize<DynamicConfig>(configData)
+                        ?? throw new InvalidOperationException("Invalid deviceconfiguration.json.");
+
+                    var cfg = deviceConfig.ProcessConfig
+                        ?? throw new InvalidOperationException("Missing ProcessConfig in configuration.");
+
+                    var temps = new Dictionary<string, double>
+                    {
+                        { "Temp_Keg", _hardware.GetTemperature("Temp_Keg", deviceConfig.Devices.Termometers) + cfg.Calibrations.Temp_Keg },
+                        { "Temp_Bufor", _hardware.GetTemperature("Temp_Bufor", deviceConfig.Devices.Termometers) + cfg.Calibrations.Temp_Bufor },
+                        { "Temp_10p", _hardware.GetTemperature("Temp_10p", deviceConfig.Devices.Termometers) + cfg.Calibrations.Temp_10p },
+                        { "Temp_Glowica", _hardware.GetTemperature("Temp_Glowica", deviceConfig.Devices.Termometers) + cfg.Calibrations.Temp_Glowica },
+                        { "Temp_Woda", _hardware.GetTemperature("Temp_Woda", deviceConfig.Devices.Termometers) + cfg.Calibrations.Temp_Woda }
+                    };
+
+                    // ADD: pump ON when Temp_Keg > CoolingWaterStart
+                    var tempKeg = temps["Temp_Keg"];
+                    tempKeg = 25;//test
+                    if (tempKeg > cfg.CoolingWaterStart)
+                    {
+                        var pumpDeviceId = GetPumpDeviceId(deviceConfig);
+
+                        if (!string.IsNullOrWhiteSpace(pumpDeviceId) && !_pumpOnCommandSent)
                         {
-                            while (!stoppingToken.IsCancellationRequested)
+                            try
                             {
+                                await _tuya.TurnPumpOnAsync(pumpDeviceId, stoppingToken);
+                                _pumpOnCommandSent = true;
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine($"Pump ON command failed: {ex.Message}");
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // reset guard when below threshold (so ON can be sent again on next crossing)
+                        _pumpOnCommandSent = false;
+                    }
+
+                    var temp10p = temps["Temp_10p"];
+                    var min = Math.Min(cfg.ValveThresholdTempMin, cfg.ValveThresholdTempMax);
+                    var max = Math.Max(cfg.ValveThresholdTempMin, cfg.ValveThresholdTempMax);
+
+                    var isTemperatureInRange = temp10p >= min && temp10p <= max;
+                    var isHeartbeatEnabled = cfg.HeartbeatReceptionEnabled;
+
+                    // Elektrozawór aktywny tylko gdy:
+                    // 1) heartbeat włączony przełącznikiem
+                    // 2) temperatura w zadanym zakresie
+                    var isValveEnabled = isHeartbeatEnabled && isTemperatureInRange;
+
+                    _hardware.SetValve(isValveEnabled);
+
+                    var powerMetrics = new Dictionary<string, PowerMetrics>(_cachedPowerMetrics, StringComparer.OrdinalIgnoreCase);
+
+                    // Tuya refresh
+                    if ((DateTime.Now - _lastTuyaRefresh).TotalSeconds >= Math.Max(1, cfg.TuyaRefreshIntervalSec))
+                    {
+                        if (deviceConfig.Tuya is not null)
+                        {
+                            foreach (var deviceEntry in deviceConfig.Tuya)
+                            {
+                                var deviceName = deviceEntry.Key;
+                                var deviceId = deviceEntry.Value?.DeviceId;
+
+                                if (string.IsNullOrWhiteSpace(deviceId))
+                                {
+                                    continue;
+                                }
+
                                 try
                                 {
-                                    var configData = await File.ReadAllTextAsync(_configFilePath, stoppingToken);
-                                    var deviceConfig = JsonSerializer.Deserialize<DynamicConfig>(configData)
-                                        ?? throw new InvalidOperationException("Invalid deviceconfiguration.json.");
-
-                                    var cfg = deviceConfig.ProcessConfig
-                                        ?? throw new InvalidOperationException("Missing ProcessConfig in configuration.");
-
-                                    var temps = new Dictionary<string, double>
-                                    {
-                                        { "Temp_Keg", _hardware.GetTemperature("Temp_Keg", deviceConfig.Devices.Termometers) + cfg.Calibrations.Temp_Keg },
-                                        { "Temp_Bufor", _hardware.GetTemperature("Temp_Bufor", deviceConfig.Devices.Termometers) + cfg.Calibrations.Temp_Bufor },
-                                        { "Temp_10p", _hardware.GetTemperature("Temp_10p", deviceConfig.Devices.Termometers) + cfg.Calibrations.Temp_10p },
-                                        { "Temp_Glowica", _hardware.GetTemperature("Temp_Glowica", deviceConfig.Devices.Termometers) + cfg.Calibrations.Temp_Glowica },
-                                        { "Temp_Woda", _hardware.GetTemperature("Temp_Woda", deviceConfig.Devices.Termometers) + cfg.Calibrations.Temp_Woda }
-                                    };
-
-                                    var temp10p = temps["Temp_10p"];
-                                    var min = Math.Min(cfg.ValveThresholdTempMin, cfg.ValveThresholdTempMax);
-                                    var max = Math.Max(cfg.ValveThresholdTempMin, cfg.ValveThresholdTempMax);
-
-                                    var isTemperatureInRange = temp10p >= min && temp10p <= max;
-                                    var isHeartbeatEnabled = cfg.HeartbeatReceptionEnabled;
-
-                                    // Elektrozawór aktywny tylko gdy:
-                                    // 1) heartbeat włączony przełącznikiem
-                                    // 2) temperatura w zadanym zakresie
-                                    var isValveEnabled = isHeartbeatEnabled && isTemperatureInRange;
-
-                                    _hardware.SetValve(isValveEnabled);
-
-                                    var powerMetrics = new Dictionary<string, PowerMetrics>(_cachedPowerMetrics, StringComparer.OrdinalIgnoreCase);
-
-                                    // Tuya refresh
-                                    if ((DateTime.Now - _lastTuyaRefresh).TotalSeconds >= Math.Max(1, cfg.TuyaRefreshIntervalSec))
-                                    {
-                                        if (deviceConfig.Tuya is not null)
-                                        {
-                                            foreach (var deviceEntry in deviceConfig.Tuya)
-                                            {
-                                                var deviceName = deviceEntry.Key;
-                                                var deviceId = deviceEntry.Value?.DeviceId;
-
-                                                if (string.IsNullOrWhiteSpace(deviceId))
-                                                {
-                                                    continue;
-                                                }
-
-                                                try
-                                                {
-                                                    powerMetrics[deviceName] = await _tuya.GetPowerMetricsAsync(deviceId, stoppingToken);
-                                                }
-                                                catch (Exception ex)
-                                                {
-                                                    Console.WriteLine($"Tuya read failed for '{deviceName}': {ex.Message}");
-                                                }
-                                            }
-                                        }
-
-                                        _cachedPowerMetrics = new Dictionary<string, PowerMetrics>(powerMetrics, StringComparer.OrdinalIgnoreCase);
-                                        _lastTuyaRefresh = DateTime.Now;
-                                    }
-
-                                    if ((DateTime.Now - _lastWeatherRefresh) >= WeatherRefreshInterval)
-                                    {
-                                        try
-                                        {
-                                            _cachedWeather = await _weatherService.GetCurrentAsync(cancellationToken: stoppingToken);
-                                            _lastWeatherRefresh = DateTime.Now;
-                                        }
-                                        catch (Exception ex)
-                                        {
-                                            Console.WriteLine($"Weather read failed: {ex.Message}");
-                                        }
-                                    }
-
-                                    var mainPower =
-                                        powerMetrics.TryGetValue("Column", out var columnPower) ? columnPower :
-                                        powerMetrics.Values.FirstOrDefault() ??
-                                        new PowerMetrics();
-
-                                    var payload = new ProcessLogPayload
-                                    {
-                                        Temperatures = temps,
-                                        Power = mainPower,
-                                        PowerByDevice = powerMetrics,
-                                        IsRecording = _state.IsRecording,
-                                        ProcessDuration = _state.IsRecording ? (DateTime.Now - _state.ProcessStartTime).ToString(@"hh\:mm\:ss") : "00:00:00",
-                                        FileName = _state.CurrentFileName,
-                                        StartTimeStr = _state.IsRecording ? _state.ProcessStartTime.ToString("yyyy-MM-dd HH:mm:ss") : "--:--:--",
-                                        WeatherTemperatureC = _cachedWeather?.TemperatureC ?? 0,
-                                        WeatherPressureHpa = _cachedWeather?.PressureHpa ?? 0,
-                                        IsValveEnabled = isValveEnabled,
-                                        IsHeartbeatReceptionEnabled = isHeartbeatEnabled
-                                    };
-
-                                    await _hubContext.Clients.All.SendAsync("ReceiveProcessData", payload, stoppingToken);
-
-                                    // CSV log refresh
-                                    if (_state.IsRecording && (DateTime.Now - _lastCsvLog).TotalSeconds >= Math.Max(1, cfg.CsvLogIntervalSec))
-                                    {
-                                        SaveToCsv(payload);
-                                        _lastCsvLog = DateTime.Now;
-                                    }
-
-                                    // Dashboard refresh delay
-                                    await Task.Delay(TimeSpan.FromSeconds(Math.Max(1, cfg.DashboardRefreshIntervalSec)), stoppingToken);
+                                    powerMetrics[deviceName] = await _tuya.GetPowerMetricsAsync(deviceId, stoppingToken);
                                 }
                                 catch (Exception ex)
                                 {
-                                    Console.WriteLine($"Error in monitoring loop: {ex.Message}");
-                                    await Task.Delay(5000, stoppingToken);
+                                    Console.WriteLine($"Tuya read failed for '{deviceName}': {ex.Message}");
                                 }
                             }
                         }
+
+                        _cachedPowerMetrics = new Dictionary<string, PowerMetrics>(powerMetrics, StringComparer.OrdinalIgnoreCase);
+                        _lastTuyaRefresh = DateTime.Now;
+                    }
+
+                    if ((DateTime.Now - _lastWeatherRefresh) >= WeatherRefreshInterval)
+                    {
+                        try
+                        {
+                            _cachedWeather = await _weatherService.GetCurrentAsync(cancellationToken: stoppingToken);
+                            _lastWeatherRefresh = DateTime.Now;
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"Weather read failed: {ex.Message}");
+                        }
+                    }
+
+                    var mainPower =
+                        powerMetrics.TryGetValue("Column", out var columnPower) ? columnPower :
+                        powerMetrics.Values.FirstOrDefault() ??
+                        new PowerMetrics();
+
+                    var payload = new ProcessLogPayload
+                    {
+                        Temperatures = temps,
+                        Power = mainPower,
+                        PowerByDevice = powerMetrics,
+                        IsRecording = _state.IsRecording,
+                        ProcessDuration = _state.IsRecording ? (DateTime.Now - _state.ProcessStartTime).ToString(@"hh\:mm\:ss") : "00:00:00",
+                        FileName = _state.CurrentFileName,
+                        StartTimeStr = _state.IsRecording ? _state.ProcessStartTime.ToString("yyyy-MM-dd HH:mm:ss") : "--:--:--",
+                        WeatherTemperatureC = _cachedWeather?.TemperatureC ?? 0,
+                        WeatherPressureHpa = _cachedWeather?.PressureHpa ?? 0,
+                        IsValveEnabled = isValveEnabled,
+                        IsHeartbeatReceptionEnabled = isHeartbeatEnabled
+                    };
+
+                    await _hubContext.Clients.All.SendAsync("ReceiveProcessData", payload, stoppingToken);
+
+                    // CSV log refresh
+                    if (_state.IsRecording && (DateTime.Now - _lastCsvLog).TotalSeconds >= Math.Max(1, cfg.CsvLogIntervalSec))
+                    {
+                        SaveToCsv(payload);
+                        _lastCsvLog = DateTime.Now;
+                    }
+
+                    // Dashboard refresh delay
+                    await Task.Delay(TimeSpan.FromSeconds(Math.Max(1, cfg.DashboardRefreshIntervalSec)), stoppingToken);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error in monitoring loop: {ex.Message}");
+                    await Task.Delay(5000, stoppingToken);
+                }
+            }
+        }
+        /// <summary>
+        /// Resolves Tuya Pump device id from configuration dictionary.
+        /// </summary>
+        /// <param name="config">Dynamic configuration object.</param>
+        /// <returns>Pump device id or null when not found.</returns>
+        private static string? GetPumpDeviceId(DynamicConfig config)
+        {
+            if (config.Tuya is null || config.Tuya.Count == 0)
+            {
+                return null;
+            }
+
+            if (config.Tuya.TryGetValue("Pump", out var pumpCfg))
+            {
+                return pumpCfg?.DeviceId;
+            }
+
+            var pumpEntry = config.Tuya.FirstOrDefault(x =>
+                string.Equals(x.Key, "Pump", StringComparison.OrdinalIgnoreCase));
+
+            return pumpEntry.Value?.DeviceId;
+        }
+
         private ProcessLogPayload GetPayloadFromFile()
         {
             var fileName = _state.CurrentFileName;

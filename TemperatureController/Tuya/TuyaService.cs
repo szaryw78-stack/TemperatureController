@@ -35,9 +35,11 @@ namespace TemperatureController.Tuya
         /// Gets current power metrics from Tuya device status.
         /// </summary>
         /// <returns>Mapped power metrics object.</returns>
-        public async Task<PowerMetrics> GetPowerMetricsAsync(string deviceId, CancellationToken cancellationToken = default)
+        public async Task<PowerMetrics> GetPowerMetricsAsync(
+            string deviceId,
+            CancellationToken cancellationToken = default)
         {
-            if (string.IsNullOrWhiteSpace(deviceId))
+            if(string.IsNullOrWhiteSpace(deviceId))
             {
                 throw new ArgumentException("Tuya deviceId is required.", nameof(deviceId));
             }
@@ -61,10 +63,10 @@ namespace TemperatureController.Tuya
             response.EnsureSuccessStatusCode();
 
             var raw = await response.Content.ReadAsStringAsync(cancellationToken);
-            var dto = JsonSerializer.Deserialize<TuyaStatusResponse>(raw, _jsonOptions)
-                      ?? throw new InvalidOperationException("Invalid Tuya status response.");
+            var dto = JsonSerializer.Deserialize<TuyaStatusResponse>(raw, _jsonOptions) ??
+                throw new InvalidOperationException("Invalid Tuya status response.");
 
-            if (!dto.Success || dto.Result is null)
+            if(!dto.Success || dto.Result is null)
             {
                 throw new InvalidOperationException($"Tuya status error: {dto.Msg}");
             }
@@ -73,10 +75,56 @@ namespace TemperatureController.Tuya
         }
 
         /// <summary>
+        /// Sends ON command to Tuya Pump device.
+        /// </summary>
+        /// <param name="pumpDeviceId">Pump device identifier in Tuya.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Asynchronous operation.</returns>
+        public async Task TurnPumpOnAsync(string pumpDeviceId, CancellationToken cancellationToken = default)
+        {
+            if(string.IsNullOrWhiteSpace(pumpDeviceId))
+            {
+                throw new ArgumentException("Pump deviceId is required.", nameof(pumpDeviceId));
+            }
+
+            var token = await GetAccessTokenAsync(cancellationToken);
+            var path = $"/v1.0/iot-03/devices/{pumpDeviceId}/commands";
+
+            var requestBody = JsonSerializer.Serialize(
+                new { commands = new[] { new { code = "switch_1", value = true } } }); //załaczenie wylaczenie pompy
+
+            var timestamp = GetTimestampMs();
+            var nonce = Guid.NewGuid().ToString("N");
+            var sign = BuildSign("POST", path, timestamp, nonce, token, requestBody);
+
+            using var request = new HttpRequestMessage(HttpMethod.Post, path);
+            request.Headers.Add("client_id", _options.ClientId);
+            request.Headers.Add("t", timestamp);
+            request.Headers.Add("sign_method", "HMAC-SHA256");
+            request.Headers.Add("sign", sign);
+            request.Headers.Add("access_token", token);
+            request.Headers.Add("nonce", nonce);
+            request.Content = new StringContent(requestBody, Encoding.UTF8, "application/json");
+
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
+            response.EnsureSuccessStatusCode();
+
+            var raw = await response.Content.ReadAsStringAsync(cancellationToken);
+            var dto = JsonSerializer.Deserialize<TuyaCommandResponse>(raw, _jsonOptions) ??
+                throw new InvalidOperationException("Invalid Tuya command response.");
+
+            if(!dto.Success)
+            {
+                throw new InvalidOperationException($"Tuya command error: {dto.Msg}");
+            }
+        }
+
+        /// <summary>
         /// Gets Tuya access token.
         /// </summary>
+        /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>Access token string.</returns>
-        private async Task<string> GetAccessTokenAsync()
+        private async Task<string> GetAccessTokenAsync(CancellationToken cancellationToken = default)
         {
             const string path = "/v1.0/token?grant_type=1";
             var timestamp = GetTimestampMs();
@@ -90,14 +138,14 @@ namespace TemperatureController.Tuya
             request.Headers.Add("sign", sign);
             request.Headers.Add("nonce", nonce);
 
-            using var response = await _httpClient.SendAsync(request);
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
             response.EnsureSuccessStatusCode();
 
-            var raw = await response.Content.ReadAsStringAsync();
-            var dto = JsonSerializer.Deserialize<TuyaTokenResponse>(raw, _jsonOptions)
-                      ?? throw new InvalidOperationException("Invalid Tuya token response.");
+            var raw = await response.Content.ReadAsStringAsync(cancellationToken);
+            var dto = JsonSerializer.Deserialize<TuyaTokenResponse>(raw, _jsonOptions) ??
+                throw new InvalidOperationException("Invalid Tuya token response.");
 
-            if (!dto.Success || dto.Result is null || string.IsNullOrWhiteSpace(dto.Result.AccessToken))
+            if(!dto.Success || dto.Result is null || string.IsNullOrWhiteSpace(dto.Result.AccessToken))
             {
                 throw new InvalidOperationException($"Tuya token error: {dto.Msg}");
             }
@@ -113,10 +161,17 @@ namespace TemperatureController.Tuya
         /// <param name="timestamp">Unix time in milliseconds.</param>
         /// <param name="nonce">Request nonce.</param>
         /// <param name="accessToken">Access token (empty for token endpoint).</param>
+        /// <param name="requestBody">Raw request body for content hash.</param>
         /// <returns>Uppercase hex signature.</returns>
-        private string BuildSign(string method, string pathAndQuery, string timestamp, string nonce, string accessToken)
+        private string BuildSign(
+            string method,
+            string pathAndQuery,
+            string timestamp,
+            string nonce,
+            string accessToken,
+            string requestBody = "")
         {
-            var contentSha256 = Sha256Hex(string.Empty);
+            var contentSha256 = Sha256Hex(requestBody ?? string.Empty);
             var stringToSign = $"{method}\n{contentSha256}\n\n{pathAndQuery}";
             var message = $"{_options.ClientId}{accessToken}{timestamp}{nonce}{stringToSign}";
             return HmacSha256HexUpper(message, _options.ClientSecret);
@@ -132,12 +187,17 @@ namespace TemperatureController.Tuya
             double Get(string code)
             {
                 var item = statuses.FirstOrDefault(x => string.Equals(x.Code, code, StringComparison.OrdinalIgnoreCase));
-                if (item?.Value is null) return 0;
+                if(item?.Value is null)
+                    return 0;
 
                 return item.Value.ValueKind switch
                 {
                     JsonValueKind.Number => item.Value.GetDouble(),
-                    JsonValueKind.String when double.TryParse(item.Value.GetString(), NumberStyles.Any, CultureInfo.InvariantCulture, out var v) => v,
+                    JsonValueKind.String when double.TryParse(
+                        item.Value.GetString(),
+                        NumberStyles.Any,
+                        CultureInfo.InvariantCulture,
+                        out var v) => v,
                     _ => 0
                 };
             }
@@ -160,8 +220,9 @@ namespace TemperatureController.Tuya
         /// Gets current Unix timestamp in milliseconds as string.
         /// </summary>
         /// <returns>Timestamp string.</returns>
-        private static string GetTimestampMs() =>
-            DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString(CultureInfo.InvariantCulture);
+        private static string GetTimestampMs() => DateTimeOffset.UtcNow
+            .ToUnixTimeMilliseconds()
+            .ToString(CultureInfo.InvariantCulture);
 
         /// <summary>
         /// Computes SHA256 hash in lowercase hexadecimal format.
@@ -195,14 +256,18 @@ namespace TemperatureController.Tuya
     public sealed class TuyaOptions
     {
         public string ApiEndpoint { get; set; } = string.Empty;
+
         public string ClientId { get; set; } = string.Empty;
+
         public string ClientSecret { get; set; } = string.Empty;
     }
 
     internal sealed class TuyaTokenResponse
     {
         [JsonPropertyName("success")] public bool Success { get; set; }
+
         [JsonPropertyName("msg")] public string? Msg { get; set; }
+
         [JsonPropertyName("result")] public TuyaTokenResult? Result { get; set; }
     }
 
@@ -214,13 +279,23 @@ namespace TemperatureController.Tuya
     internal sealed class TuyaStatusResponse
     {
         [JsonPropertyName("success")] public bool Success { get; set; }
+
         [JsonPropertyName("msg")] public string? Msg { get; set; }
+
         [JsonPropertyName("result")] public List<TuyaStatusItem>? Result { get; set; }
     }
 
     internal sealed class TuyaStatusItem
     {
         [JsonPropertyName("code")] public string Code { get; set; } = string.Empty;
+
         [JsonPropertyName("value")] public JsonElement Value { get; set; }
+    }
+
+    internal sealed class TuyaCommandResponse
+    {
+        [JsonPropertyName("success")] public bool Success { get; set; }
+
+        [JsonPropertyName("msg")] public string? Msg { get; set; }
     }
 }
