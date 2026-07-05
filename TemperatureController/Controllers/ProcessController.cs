@@ -10,16 +10,22 @@
     {
         private readonly ProcessStateManager _state;
         private readonly IConfigFileService _configFileService;
+        private readonly HardwareService _hardware;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ProcessController"/> class.
         /// </summary>
         /// <param name="state">Shared process state manager.</param>
         /// <param name="configFileService">Configuration file service.</param>
-        public ProcessController(ProcessStateManager state, IConfigFileService configFileService)
+        /// <param name="hardware">Hardware service.</param>
+        public ProcessController(
+            ProcessStateManager state,
+            IConfigFileService configFileService,
+            HardwareService hardware)
         {
             _state = state;
             _configFileService = configFileService;
+            _hardware = hardware;
         }
 
         /// <summary>
@@ -128,9 +134,10 @@
 
         /// <summary>
         /// Sets heartbeat reception state and persists it in deviceconfiguration.json.
+        /// Also applies immediate valve state based on current Temp_10p range.
         /// </summary>
         /// <param name="dto">Requested heartbeat state.</param>
-        /// <returns>Saved state.</returns>
+        /// <returns>Saved state and immediate valve evaluation.</returns>
         [HttpPost("heartbeat-toggle")]
         public IActionResult SetHeartbeat([FromBody] HeartbeatToggleDto dto)
         {
@@ -143,7 +150,37 @@
             config.ProcessConfig.HeartbeatReceptionEnabled = dto.Enabled;
             _configFileService.Save(config);
 
-            return Ok(new { enabled = config.ProcessConfig.HeartbeatReceptionEnabled });
+            // Read-back to confirm persistence from file.
+            var persisted = _configFileService.Read();
+            var enabled = persisted.ProcessConfig.HeartbeatReceptionEnabled;
+
+            bool isValveEnabled = false;
+            double? temp10p = null;
+
+            try
+            {
+                var cfg = persisted.ProcessConfig;
+                var rawTemp10p = _hardware.GetTemperature("Temp_10p", persisted.Devices.Termometers);
+                temp10p = rawTemp10p + cfg.Calibrations.Temp_10p;
+
+                var min = Math.Min(cfg.ValveThresholdTempMin, cfg.ValveThresholdTempMax);
+                var max = Math.Max(cfg.ValveThresholdTempMin, cfg.ValveThresholdTempMax);
+                var isInRange = temp10p >= min && temp10p <= max;
+
+                isValveEnabled = enabled && isInRange;
+                _hardware.SetValve(isValveEnabled);
+            }
+            catch
+            {
+                // Keep endpoint resilient in non-hardware environments.
+            }
+
+            return Ok(new
+            {
+                enabled,
+                isValveEnabled,
+                temp10p
+            });
         }
     }
 
