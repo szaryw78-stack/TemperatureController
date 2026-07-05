@@ -2,9 +2,9 @@
   "ProcessConfig": {
     "DashboardRefreshIntervalMs": 5001,
     "CsvLogIntervalMs": 6002,
-    "ValveThresholdTempMin": 78.05,
-    "ValveThresholdTempMax": 78.66,
-    "HeartbeatReceptionEnabled": true,
+    "ValveThresholdTempMin": 29.0,
+    "ValveThresholdTempMax": 35.0,
+    "HeartbeatReceptionEnabled": false,
     "Calibrations": {
       "Temp_Keg": 0,
       "Temp_Bufor": 0,
