@@ -99,40 +99,65 @@ public class HardwareService : IDisposable
 
     //    return 0;
     //}
+    /// <summary>
+    /// Reads temperature from a DS18B20 sensor.
+    /// </summary>
+    /// <param name="sensorName">Logical sensor name.</param>
+    /// <param name="termometersConfig">Runtime thermometer configuration map.</param>
+    /// <returns>Temperature in Celsius; simulation value when Raspberry Pi mode is disabled; 0 when read fails.</returns>
     public double GetTemperature(string sensorName, Dictionary<string, DeviceItemConfig> termometersConfig)
     {
+        if (!_useRaspberryPi)
+        {
+            // Simulation value for local development outside Raspberry Pi.
+            return 20.0 + (Random.Shared.NextDouble() * 2.0);
+        }
+
         try
         {
-            // Pobieramy obiekt z nowego modelu i wyciągamy z niego DeviceId
-            if (termometersConfig != null &&
-                termometersConfig.TryGetValue(sensorName, out var config) &&
-                !string.IsNullOrEmpty(config.DeviceId))
-            {
-                string deviceId = config.DeviceId;
-                string filePath = $"/sys/bus/w1/devices/{deviceId}/w1_slave";
+            DeviceItemConfig? sensorConfig = null;
+            var hasRuntimeConfig = termometersConfig != null
+                && termometersConfig.TryGetValue(sensorName, out sensorConfig)
+                && !string.IsNullOrWhiteSpace(sensorConfig?.DeviceId);
 
-                if (System.IO.File.Exists(filePath))
-                {
-                    string[] lines = System.IO.File.ReadAllLines(filePath);
-                    if (lines.Length >= 2 && lines[0].Contains("YES"))
-                    {
-                        int tIndex = lines[1].IndexOf("t=");
-                        if (tIndex != -1)
-                        {
-                            string tempStr = lines[1].Substring(tIndex + 2);
-                            if (double.TryParse(tempStr, out double temp))
-                            {
-                                return temp / 1000.0;
-                            }
-                        }
-                    }
-                }
+            var deviceId = hasRuntimeConfig
+                ? sensorConfig!.DeviceId
+                : (_sensorMap.TryGetValue(sensorName, out var fallbackDeviceId) ? fallbackDeviceId : string.Empty);
+
+            if (string.IsNullOrWhiteSpace(deviceId))
+            {
+                return 0.0;
+            }
+
+            var filePath = $"/sys/bus/w1/devices/{deviceId}/w1_slave";
+            if (!System.IO.File.Exists(filePath))
+            {
+                return 0.0;
+            }
+
+            var lines = System.IO.File.ReadAllLines(filePath);
+            if (lines.Length < 2 || !lines[0].Contains("YES", StringComparison.OrdinalIgnoreCase))
+            {
+                return 0.0;
+            }
+
+            var tIndex = lines[1].IndexOf("t=", StringComparison.Ordinal);
+            if (tIndex < 0)
+            {
+                return 0.0;
+            }
+
+            var tempStr = lines[1].Substring(tIndex + 2);
+            if (double.TryParse(tempStr, NumberStyles.Float, CultureInfo.InvariantCulture, out var milliCelsius))
+            {
+                return milliCelsius / 1000.0;
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Błąd odczytu z czujnika {sensorName}: {ex.Message}");
+            Console.WriteLine($"Temperature read error for sensor '{sensorName}': {ex.Message}");
         }
+
         return 0.0;
     }
 
