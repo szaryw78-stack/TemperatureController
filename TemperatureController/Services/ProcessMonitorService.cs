@@ -171,15 +171,22 @@
                         powerMetrics.Values.FirstOrDefault() ??
                         new PowerMetrics();
 
+                    // 1) W ExecuteAsync - przed budową payload
+                    var processStartTime = ResolveProcessStartTime(_state.CurrentFileName) ?? _state.ProcessStartTime;
+
                     var payload = new ProcessLogPayload
                     {
                         Temperatures = temps,
                         Power = mainPower,
                         PowerByDevice = powerMetrics,
                         IsRecording = _state.IsRecording,
-                        ProcessDuration = _state.IsRecording ? (DateTime.Now - _state.ProcessStartTime).ToString(@"hh\:mm\:ss") : "00:00:00",
+                        ProcessDuration = _state.IsRecording
+                            ? (DateTime.Now - processStartTime).ToString(@"hh\:mm\:ss")
+                            : "00:00:00",
                         FileName = _state.CurrentFileName,
-                        StartTimeStr = _state.IsRecording ? _state.ProcessStartTime.ToString("yyyy-MM-dd HH:mm:ss") : "--:--:--",
+                        StartTimeStr = _state.IsRecording
+                            ? processStartTime.ToString("yyyy-MM-dd HH:mm:ss")
+                            : "--:--:--",
                         WeatherTemperatureC = _cachedWeather?.TemperatureC ?? 0,
                         WeatherPressureHpa = _cachedWeather?.PressureHpa ?? 0,
                         IsValveEnabled = isValveEnabled,
@@ -280,8 +287,11 @@
                 // 5. Przygotowanie danych
                 if (_state.IsRecording)
                 {
-                    // Jeśli plik istnieje, czas procesu to różnica między teraz a datą stworzenia pliku
-                    TimeSpan duration = DateTime.Now - _state.ProcessStartTime;
+                    //// Jeśli plik istnieje, czas procesu to różnica między teraz a datą stworzenia pliku
+                    //TimeSpan duration = DateTime.Now - _state.ProcessStartTime;
+                    //payload.ProcessDuration = duration.ToString(@"hh\:mm\:ss");
+                    var processStartTime = ResolveProcessStartTime(_state.CurrentFileName) ?? _state.ProcessStartTime;
+                    var duration = DateTime.Now - processStartTime;
                     payload.ProcessDuration = duration.ToString(@"hh\:mm\:ss");
                 }
                 else
@@ -384,6 +394,61 @@ private void EnsureCsvHeader(string fileName)
     }
 
     File.WriteAllLines(fileName, lines);
+}
+        /// <summary>
+/// Resolves process start time from the oldest data record in CSV file.
+/// </summary>
+/// <param name="baseFileName">Base file name from process state.</param>
+/// <returns>Start timestamp from first data row or null when unavailable.</returns>
+private static DateTime? ResolveProcessStartTime(string baseFileName)
+{
+    var fileName = baseFileName;
+    if (!fileName.EndsWith(".csv", StringComparison.OrdinalIgnoreCase))
+    {
+        fileName += ".csv";
+    }
+
+    if (!File.Exists(fileName))
+    {
+        return null;
+    }
+
+    using var stream = new FileStream(fileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+    using var reader = new StreamReader(stream);
+
+    _ = reader.ReadLine(); // header
+
+    string? line;
+    while ((line = reader.ReadLine()) != null)
+    {
+        if (string.IsNullOrWhiteSpace(line))
+        {
+            continue;
+        }
+
+        var parts = line.Split(';');
+        if (parts.Length == 0)
+        {
+            continue;
+        }
+
+        if (DateTime.TryParseExact(
+                parts[0],
+                "yyyy-MM-dd HH:mm:ss",
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.AssumeLocal,
+                out var parsed))
+        {
+            return parsed;
+        }
+
+        if (DateTime.TryParse(parts[0], out parsed))
+        {
+            return parsed;
+        }
+    }
+
+    return null;
 }
     }
     public class DashboardHub : Hub
