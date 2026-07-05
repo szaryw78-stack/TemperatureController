@@ -2,18 +2,25 @@
 {
     using Microsoft.AspNetCore.Mvc;
     using TemperatureController.Models;
+    using TemperatureController.Services;
 
     [ApiController]
     [Route("api/[controller]")]
     public class ProcessController : ControllerBase
     {
         private readonly ProcessStateManager _state;
+        private readonly IConfigFileService _configFileService;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ProcessController"/> class.
         /// </summary>
         /// <param name="state">Shared process state manager.</param>
-        public ProcessController(ProcessStateManager state) => _state = state;
+        /// <param name="configFileService">Configuration file service.</param>
+        public ProcessController(ProcessStateManager state, IConfigFileService configFileService)
+        {
+            _state = state;
+            _configFileService = configFileService;
+        }
 
         /// <summary>
         /// Toggles process recording state.
@@ -107,6 +114,37 @@
 
             return Ok(history);
         }
+
+        /// <summary>
+        /// Gets current heartbeat reception state.
+        /// </summary>
+        /// <returns>Current state from deviceconfiguration.json.</returns>
+        [HttpGet("heartbeat-status")]
+        public IActionResult GetHeartbeatStatus()
+        {
+            var config = _configFileService.Read();
+            return Ok(new { enabled = config.ProcessConfig.HeartbeatReceptionEnabled });
+        }
+
+        /// <summary>
+        /// Sets heartbeat reception state and persists it in deviceconfiguration.json.
+        /// </summary>
+        /// <param name="dto">Requested heartbeat state.</param>
+        /// <returns>Saved state.</returns>
+        [HttpPost("heartbeat-toggle")]
+        public IActionResult SetHeartbeat([FromBody] HeartbeatToggleDto dto)
+        {
+            if (dto is null)
+            {
+                return BadRequest("Brak danych wejściowych.");
+            }
+
+            var config = _configFileService.Read();
+            config.ProcessConfig.HeartbeatReceptionEnabled = dto.Enabled;
+            _configFileService.Save(config);
+
+            return Ok(new { enabled = config.ProcessConfig.HeartbeatReceptionEnabled });
+        }
     }
 
     public class CommentDto
@@ -117,5 +155,10 @@
     public class FileNameDto
     {
         public string Name { get; set; } = string.Empty;
+    }
+
+    public class HeartbeatToggleDto
+    {
+        public bool Enabled { get; set; }
     }
 }

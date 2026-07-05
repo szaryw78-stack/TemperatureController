@@ -4,16 +4,17 @@
     "CsvLogIntervalMs": 6002,
     "ValveThresholdTempMin": 78.05,
     "ValveThresholdTempMax": 78.66,
+    "HeartbeatReceptionEnabled": true,
     "Calibrations": {
-      "Temp_Keg": -0.05,
-      "Temp_Bufor": -0.5,
-      "Temp_10p": 0.15,
-      "Temp_Glowica": 0.05,
-      "Temp_Woda": 0.05
+      "Temp_Keg": 0,
+      "Temp_Bufor": 0,
+      "Temp_10p": 0,
+      "Temp_Glowica": 0,
+      "Temp_Woda": 0
     },
-    "TuyaRefreshIntervalMs": 6003,
-    "CoolingWaterStart": 25,
-    "EmergencyStop": 35
+    "TuyaRefreshIntervalMs": 0,
+    "CoolingWaterStart": 0,
+    "EmergencyStop": 0
   },
   "Devices": {
     "Termometers": {

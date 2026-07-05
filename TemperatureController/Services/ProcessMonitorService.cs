@@ -76,7 +76,14 @@
                                     var temp10p = temps["Temp_10p"];
                                     var min = Math.Min(cfg.ValveThresholdTempMin, cfg.ValveThresholdTempMax);
                                     var max = Math.Max(cfg.ValveThresholdTempMin, cfg.ValveThresholdTempMax);
-                                    var isValveEnabled = temp10p >= min && temp10p <= max;
+
+                                    var isTemperatureInRange = temp10p >= min && temp10p <= max;
+                                    var isHeartbeatEnabled = cfg.HeartbeatReceptionEnabled;
+
+                                    // Elektrozawór aktywny tylko gdy:
+                                    // 1) heartbeat włączony przełącznikiem
+                                    // 2) temperatura w zadanym zakresie
+                                    var isValveEnabled = isHeartbeatEnabled && isTemperatureInRange;
 
                                     _hardware.SetValve(isValveEnabled);
 
@@ -146,7 +153,8 @@
                                         StartTimeStr = _state.IsRecording ? _state.ProcessStartTime.ToString("yyyy-MM-dd HH:mm:ss") : "--:--:--",
                                         WeatherTemperatureC = _cachedWeather?.TemperatureC ?? 0,
                                         WeatherPressureHpa = _cachedWeather?.PressureHpa ?? 0,
-                                        IsValveEnabled = isValveEnabled
+                                        IsValveEnabled = isValveEnabled,
+                                        IsHeartbeatReceptionEnabled = isHeartbeatEnabled
                                     };
 
                                     await _hubContext.Clients.All.SendAsync("ReceiveProcessData", payload, stoppingToken);
@@ -341,5 +349,6 @@ private void EnsureCsvHeader(string fileName)
         public double WeatherTemperatureC { get; set; }
         public double WeatherPressureHpa { get; set; }
         public bool IsValveEnabled { get; set; }
+        public bool IsHeartbeatReceptionEnabled { get; set; } // Dodane pole
     }
 }

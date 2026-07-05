@@ -40,6 +40,10 @@ namespace TemperatureController.Controllers
             if (config.ProcessConfig != null)
             {
                 incomingProcessConfig.Calibrations = config.ProcessConfig.Calibrations;
+
+                // Zachowujemy stan heartbeat z pliku konfiguracyjnego
+                // (żeby zapis ustawień procesu go nie nadpisywał).
+                incomingProcessConfig.HeartbeatReceptionEnabled = config.ProcessConfig.HeartbeatReceptionEnabled;
             }
 
             config.ProcessConfig = incomingProcessConfig;
