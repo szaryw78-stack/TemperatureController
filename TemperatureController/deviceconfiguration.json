@@ -1,7 +1,7 @@
 {
   "ProcessConfig": {
-    "DashboardRefreshIntervalMs": 5001,
-    "CsvLogIntervalMs": 6002,
+    "DashboardRefreshIntervalSec": 5,
+    "CsvLogIntervalSec": 6,
     "ValveThresholdTempMin": 29,
     "ValveThresholdTempMax": 35,
     "HeartbeatReceptionEnabled": true,
@@ -12,7 +12,7 @@
       "Temp_Glowica": 0,
       "Temp_Woda": 0
     },
-    "TuyaRefreshIntervalMs": 5000,
+    "TuyaRefreshIntervalSec": 5,
     "CoolingWaterStart": 29,
     "EmergencyStop": 80
   },

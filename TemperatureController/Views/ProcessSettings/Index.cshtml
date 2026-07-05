@@ -86,17 +86,18 @@
     <div class="fiori-card">
         <h3 style="margin-top:0; color: var(--fiori-blue);">Główne Parametry (ProcessConfig)</h3>
         <div class="param-grid">
+            @* labels *@
             <div class="form-group">
-                <label>Odświeżanie Dashboard  (ms)</label>
-                <input type="number" id="pc_DashboardRefresh" value="@Model.ProcessConfig.DashboardRefreshIntervalMs" />
+                <label>Odświeżanie Dashboard (s)</label>
+                <input type="number" id="pc_DashboardRefresh" value="@Model.ProcessConfig.DashboardRefreshIntervalSec" />
             </div>
             <div class="form-group">
-                <label>Interwał zapisu do logu CSV (ms)</label>
-                <input type="number" id="pc_CsvLog" value="@Model.ProcessConfig.CsvLogIntervalMs" />
+                <label>Interwał zapisu do logu CSV (s)</label>
+                <input type="number" id="pc_CsvLog" value="@Model.ProcessConfig.CsvLogIntervalSec" />
             </div>
             <div class="form-group">
-                <label> Pobieranie danych z Tuya (ms)</label>
-                <input type="number" id="pc_TuyaRefresh" value="@Model.ProcessConfig.TuyaRefreshIntervalMs" />
+                <label>Pobieranie danych z Tuya (s)</label>
+                <input type="number" id="pc_TuyaRefresh" value="@Model.ProcessConfig.TuyaRefreshIntervalSec" />
             </div>
             <div class="form-group">    
                 <label>Temperatura wyłączenia zaworu (°C)</label>
@@ -117,6 +118,12 @@
                 <label>Zatrzymanie awaryjne kolumny (°C)</label>
                 <input type="number" step="0.1" id="pc_EmergencyStop"
                        value="@Model.ProcessConfig.EmergencyStop.ToString(System.Globalization.CultureInfo.InvariantCulture)" />
+            </div>
+            <div class="form-group">
+                <label>Status odbioru serca (HeartbeatReceptionEnabled)</label>
+                <input type="checkbox" id="pc_HeartbeatReceptionEnabled"
+                       @(Model.ProcessConfig.HeartbeatReceptionEnabled ? "checked" : "")
+                       disabled />
             </div>
         </div>
     </div>
@@ -210,9 +217,9 @@
     async function saveSettings() {
         const payload = {
             ProcessConfig: {
-                DashboardRefreshIntervalMs: parseInt(document.getElementById('pc_DashboardRefresh').value) || 5000,
-                CsvLogIntervalMs: parseInt(document.getElementById('pc_CsvLog').value) || 6000,
-                TuyaRefreshIntervalMs: parseInt(document.getElementById('pc_TuyaRefresh').value) || 6000,
+                DashboardRefreshIntervalSec: parseInt(document.getElementById('pc_DashboardRefresh').value) || 5,
+                CsvLogIntervalSec: parseInt(document.getElementById('pc_CsvLog').value) || 6,
+                TuyaRefreshIntervalSec: parseInt(document.getElementById('pc_TuyaRefresh').value) || 5,
                 ValveThresholdTempMin: parseFloat(document.getElementById('pc_ValveTempMin').value.replace(',', '.')) || 78.0,
                 ValveThresholdTempMax: parseFloat(document.getElementById('pc_ValveTempMax').value.replace(',', '.')) || 78.5,
                 CoolingWaterStart: parseFloat(document.getElementById('pc_CoolingWater').value.replace(',', '.')) || 0,

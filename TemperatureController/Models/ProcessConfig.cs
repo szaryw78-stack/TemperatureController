@@ -2,8 +2,8 @@ namespace TemperatureController.Models
 {
     public class ProcessConfig
     {
-        public int DashboardRefreshIntervalMs { get; set; }
-        public int CsvLogIntervalMs { get; set; }
+        public int DashboardRefreshIntervalSec { get; set; } = 5;
+        public int CsvLogIntervalSec { get; set; } = 6;
         public double ValveThresholdTempMin { get; set; }
         public double ValveThresholdTempMax { get; set; }
 
@@ -14,7 +14,7 @@ namespace TemperatureController.Models
         public bool HeartbeatReceptionEnabled { get; set; } = true;
 
         public Calibrations Calibrations { get; set; } = new();
-        public int TuyaRefreshIntervalMs { get; set; }
+        public int TuyaRefreshIntervalSec { get; set; } = 5;
         public double CoolingWaterStart { get; set; }
         public double EmergencyStop { get; set; }
     }

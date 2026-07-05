@@ -94,7 +94,8 @@
 
                                     var powerMetrics = new Dictionary<string, PowerMetrics>(_cachedPowerMetrics, StringComparer.OrdinalIgnoreCase);
 
-                                    if ((DateTime.Now - _lastTuyaRefresh).TotalMilliseconds >= cfg.TuyaRefreshIntervalMs)
+                                    // Tuya refresh
+                                    if ((DateTime.Now - _lastTuyaRefresh).TotalSeconds >= Math.Max(1, cfg.TuyaRefreshIntervalSec))
                                     {
                                         if (deviceConfig.Tuya is not null)
                                         {
@@ -158,13 +159,15 @@
 
                                     await _hubContext.Clients.All.SendAsync("ReceiveProcessData", payload, stoppingToken);
 
-                                    if (_state.IsRecording && (DateTime.Now - _lastCsvLog).TotalMilliseconds >= cfg.CsvLogIntervalMs)
+                                    // CSV log refresh
+                                    if (_state.IsRecording && (DateTime.Now - _lastCsvLog).TotalSeconds >= Math.Max(1, cfg.CsvLogIntervalSec))
                                     {
                                         SaveToCsv(payload);
                                         _lastCsvLog = DateTime.Now;
                                     }
 
-                                    await Task.Delay(cfg.DashboardRefreshIntervalMs, stoppingToken);
+                                    // Dashboard refresh delay
+                                    await Task.Delay(TimeSpan.FromSeconds(Math.Max(1, cfg.DashboardRefreshIntervalSec)), stoppingToken);
                                 }
                                 catch (Exception ex)
                                 {
