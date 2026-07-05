@@ -12,9 +12,9 @@
       "Temp_Glowica": 0,
       "Temp_Woda": 0
     },
-    "TuyaRefreshIntervalMs": 0,
-    "CoolingWaterStart": 0,
-    "EmergencyStop": 0
+    "TuyaRefreshIntervalMs": 5000,
+    "CoolingWaterStart": 29,
+    "EmergencyStop": 80
   },
   "Devices": {
     "Termometers": {
