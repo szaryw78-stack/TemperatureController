@@ -5,7 +5,7 @@
     using TemperatureController.Services;
 
     [ApiController]
-    [Route("api/[controller]")]
+    [Route("api/process")]
     public class ProcessController : ControllerBase
     {
         private readonly ProcessStateManager _state;

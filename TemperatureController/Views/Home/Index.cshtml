@@ -501,37 +501,39 @@
             </div>
         } *@
         <div class="section-title">Sekcja 2: Zarządzanie energią</div>
-        
-        @{
-            var configPath = System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "deviceconfiguration.json");
-            var visibleDevices = new List<string>();
-            if (System.IO.File.Exists(configPath))
+
+@{
+    var configPath = System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "deviceconfiguration.json");
+    var visibleDevices = new List<string>();
+
+    if (System.IO.File.Exists(configPath))
+    {
+        var json = System.IO.File.ReadAllText(configPath);
+        using var doc = System.Text.Json.JsonDocument.Parse(json);
+
+        if (doc.RootElement.TryGetProperty("Tuya", out var tuya))
+        {
+            foreach (var dev in tuya.EnumerateObject())
             {
-                var json = System.IO.File.ReadAllText(configPath);
-                using (var doc = System.Text.Json.JsonDocument.Parse(json))
+                if (dev.Value.TryGetProperty("VisibleOnDashboard", out var vis) && vis.GetBoolean())
                 {
-                    if (doc.RootElement.TryGetProperty("Tuya", out var tuya))
-                    {
-                        foreach (var dev in tuya.EnumerateObject())
-                        {
-                            if (dev.Value.TryGetProperty("VisibleOnDashboard", out var vis) && vis.GetBoolean())
-                                visibleDevices.Add(dev.Name);
-                        }
-                    }
+                    visibleDevices.Add(dev.Name);
                 }
             }
         }
+    }
+}
 
-        @foreach(var dev in visibleDevices)
-        {
-            <div style="margin: 15px 0 5px 0; font-weight: bold; color: var(--fiori-blue);">@dev</div>
-            <div class="tiles-grid">
-                <div class="tile"><div class="tile-header">Napięcie</div><div class="tile-value" id="val_voltage_@dev">-- V</div></div>
-                <div class="tile"><div class="tile-header">Prąd</div><div class="tile-value" id="val_current_@dev">-- A</div></div>
-                <div class="tile"><div class="tile-header">Moc</div><div class="tile-value" id="val_power_@dev">-- W</div></div>
-                <div class="tile"><div class="tile-header">Sesja</div><div class="tile-value" id="val_energy_@dev">-- kWh</div></div>
-            </div>
-        }
+@foreach (var dev in visibleDevices)
+{
+    <div style="margin: 15px 0 5px 0; font-weight: bold; color: var(--fiori-blue);">@dev</div>
+    <div class="tiles-grid">
+        <div class="tile"><div class="tile-header">Napięcie</div><div class="tile-value" id="val_voltage_@dev">-- V</div></div>
+        <div class="tile"><div class="tile-header">Prąd</div><div class="tile-value" id="val_current_@dev">-- A</div></div>
+        <div class="tile"><div class="tile-header">Moc</div><div class="tile-value" id="val_power_@dev">-- W</div></div>
+        <div class="tile"><div class="tile-header">Sesja</div><div class="tile-value" id="val_energy_@dev">-- kWh</div></div>
+    </div>
+}
         @* wykres *@
         <div class="section-title">Wykres online (SignalR)</div>
         <div class="chart-container">
@@ -657,6 +659,13 @@
             return key ? obj[key] : null;
         };
 
+        const getSafeObject = (obj, propName) => {
+            if (!obj || typeof obj !== 'object') return null;
+            const key = Object.keys(obj).find(k => k.toLowerCase() === propName.toLowerCase());
+            const val = key ? obj[key] : null;
+            return (val && typeof val === 'object') ? val : null;
+        };
+
         function loadChartHistory() {
             fetch('/api/process/history')
                 .then(response => response.json())
@@ -691,83 +700,128 @@
             .withAutomaticReconnect()
             .build();
 
-        const activeDevices = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(visibleDevices));
+// DODAJ TO (brakowało)
+const activeDevices = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(visibleDevices));
 
-        connection.on("ReceiveProcessData", function (data) {
-            const temperatures = data.temperatures ?? data.Temperatures ?? {};
-            const powerByDevice = data.powerByDevice ?? data.PowerByDevice ?? {};
-            
-            // Temperatury
-            if (temperatures && Object.keys(temperatures).length > 0) {
-                const tempKeg = getSafeValue(temperatures, 'Temp_Keg');
-                const tempBufor = getSafeValue(temperatures, 'Temp_Bufor');
-                const temp10p = getSafeValue(temperatures, 'Temp_10p');
-                const tempGlowica = getSafeValue(temperatures, 'Temp_Glowica');
-                const tempWoda = getSafeValue(temperatures, 'Temp_Woda');
+function normalizePowerByDevice(raw) {
+    if (!raw) return {};
 
-                document.getElementById('val_temp_keg').innerText = tempKeg !== null ? tempKeg.toFixed(2) + " °C" : "-- °C";
-                document.getElementById('val_temp_bufor').innerText = tempBufor !== null ? tempBufor.toFixed(2) + " °C" : "-- °C";
-                document.getElementById('val_temp_10p').innerText = temp10p !== null ? temp10p.toFixed(2) + " °C" : "-- °C";
-                document.getElementById('val_temp_glowica').innerText = tempGlowica !== null ? tempGlowica.toFixed(2) + " °C" : "-- °C";
-                document.getElementById('val_temp_woda').innerText = tempWoda !== null ? tempWoda.toFixed(2) + " °C" : "-- °C";
-            }
+    // Standard object map: { "Column": {...}, "Pump": {...} }
+    if (!Array.isArray(raw) && typeof raw === 'object') {
+        return raw;
+    }
 
-            // Energia
-            activeDevices.forEach(dev => {
-                const devKey = Object.keys(powerByDevice).find(k => k.toLowerCase() === dev.toLowerCase());
-                const d = devKey ? powerByDevice[devKey] : null;
-                
-                if (d) {
-                    const voltageEl = document.getElementById('val_voltage_' + dev);
-                    const currentEl = document.getElementById('val_current_' + dev);
-                    const powerEl = document.getElementById('val_power_' + dev);
-                    const energyEl = document.getElementById('val_energy_' + dev);
-
-                    if (voltageEl) voltageEl.innerText = (getSafeValue(d, 'voltage') || 0).toFixed(1) + " V";
-                    if (currentEl) currentEl.innerText = (getSafeValue(d, 'current') || 0).toFixed(2) + " A";
-                    if (powerEl) powerEl.innerText = (getSafeValue(d, 'power') || 0).toFixed(0) + " W";
-                    if (energyEl) energyEl.innerText = (getSafeValue(d, 'sessionEnergy') || 0).toFixed(3) + " kWh";
-                }
-            });
-
-            // Czas i stan procesu
-            document.getElementById('ui_duration').innerText = getSafeString(data, 'processDuration') ?? "00:00:00";
-            document.getElementById('ui_startTime').innerText = getSafeString(data, 'startTimeStr') ?? "--:--:--";
-
-            isRecording = !!(getSafeValue(data, 'isRecording'));
-            setToggleButtonState();
-
-            // Aktualizacja Wykresu
-            const now = new Date().toLocaleTimeString();
-            processChart.data.labels.push(now);
-            processChart.data.datasets[0].data.push(getSafeValue(temperatures, 'Temp_Keg'));
-            processChart.data.datasets[1].data.push(getSafeValue(temperatures, 'Temp_Bufor'));
-            processChart.data.datasets[2].data.push(getSafeValue(temperatures, 'Temp_10p'));
-            processChart.data.datasets[3].data.push(getSafeValue(temperatures, 'Temp_Glowica'));
-            processChart.data.datasets[4].data.push(getSafeValue(temperatures, 'Temp_Woda'));
-            
-            const mainPowerData = getSafeValue(data, 'power') || getSafeValue(powerByDevice, 'power');
-            processChart.data.datasets[5].data.push(mainPowerData);
-
-            if (processChart.data.labels.length > 120) {
-                processChart.data.labels.shift();
-                processChart.data.datasets.forEach(d => d.data.shift());
-            }
-            processChart.update();
-
-            // Lampka zaworu
-            const lamp = document.getElementById('valve_range_lamp');
-            const text = document.getElementById('valve_range_text');
-            const inRange = !!(getSafeValue(data, 'isValveEnabled')); 
-
-            lamp.classList.remove('status-lamp-green', 'status-lamp-red');
-            lamp.classList.add(inRange ? 'status-lamp-green' : 'status-lamp-red');
-            text.innerText = inRange ? "ZAŁĄCZONY" : "WYŁĄCZONY";
-
-            // Heartbeat
-            heartbeatEnabled = !!(getSafeValue(data, 'isHeartbeatReceptionEnabled'));
-            setHeartbeatButtonState();
+    // Array format: [{ key: "Column", value: {...} }] or [{ Key, Value }]
+    if (Array.isArray(raw)) {
+        const map = {};
+        raw.forEach(item => {
+            const k = item?.key ?? item?.Key;
+            const v = item?.value ?? item?.Value;
+            if (k) map[k] = v;
         });
+        return map;
+    }
+
+    return {};
+}
+
+connection.on("ReceiveProcessData", function (data) {
+    const temperatures = data.temperatures ?? data.Temperatures ?? {};
+
+    // Replace old line:
+    // const powerByDevice = data.powerByDevice ?? data.PowerByDevice ?? {};
+    const powerByDeviceRaw = data.powerByDevice ?? data.PowerByDevice ?? {};
+    const powerByDevice = normalizePowerByDevice(powerByDeviceRaw);
+
+    // Optional debug (temporary)
+    // console.log("ReceiveProcessData powerByDevice:", powerByDevice);
+
+    // Temperatury
+    if (temperatures && Object.keys(temperatures).length > 0) {
+        const tempKeg = getSafeValue(temperatures, 'Temp_Keg');
+        const tempBufor = getSafeValue(temperatures, 'Temp_Bufor');
+        const temp10p = getSafeValue(temperatures, 'Temp_10p');
+        const tempGlowica = getSafeValue(temperatures, 'Temp_Glowica');
+        const tempWoda = getSafeValue(temperatures, 'Temp_Woda');
+
+        document.getElementById('val_temp_keg').innerText = tempKeg !== null ? tempKeg.toFixed(2) + " °C" : "-- °C";
+        document.getElementById('val_temp_bufor').innerText = tempBufor !== null ? tempBufor.toFixed(2) + " °C" : "-- °C";
+        document.getElementById('val_temp_10p').innerText = temp10p !== null ? temp10p.toFixed(2) + " °C" : "-- °C";
+        document.getElementById('val_temp_glowica').innerText = tempGlowica !== null ? tempGlowica.toFixed(2) + " °C" : "-- °C";
+        document.getElementById('val_temp_woda').innerText = tempWoda !== null ? tempWoda.toFixed(2) + " °C" : "-- °C";
+    }
+
+    // Energia - musi być wewnątrz handlera (tu jest dostęp do powerByDevice)
+    const renderedDevices = getRenderedEnergyDevices();
+
+    renderedDevices.forEach(dev => {
+        const d = findDevicePayload(powerByDevice, dev);
+
+        const voltageEl = document.getElementById('val_voltage_' + dev);
+        const currentEl = document.getElementById('val_current_' + dev);
+        const powerEl = document.getElementById('val_power_' + dev);
+        const energyEl = document.getElementById('val_energy_' + dev);
+
+        if (!d) {
+            if (voltageEl) voltageEl.innerText = "-- V";
+            if (currentEl) currentEl.innerText = "-- A";
+            if (powerEl) powerEl.innerText = "-- W";
+            if (energyEl) energyEl.innerText = "-- kWh";
+            return;
+        }
+
+        if (voltageEl) voltageEl.innerText = (getSafeValue(d, 'voltage') ?? 0).toFixed(1) + " V";
+        if (currentEl) currentEl.innerText = (getSafeValue(d, 'current') ?? 0).toFixed(2) + " A";
+        if (powerEl) powerEl.innerText = (getSafeValue(d, 'power') ?? 0).toFixed(0) + " W";
+        if (energyEl) energyEl.innerText = (getSafeValue(d, 'sessionEnergy') ?? 0).toFixed(3) + " kWh";
+    });
+
+    // Czas i stan procesu
+    document.getElementById('ui_duration').innerText = getSafeString(data, 'processDuration') ?? "00:00:00";
+    document.getElementById('ui_startTime').innerText = getSafeString(data, 'startTimeStr') ?? "--:--:--";
+
+    isRecording = !!(getSafeValue(data, 'isRecording'));
+    setToggleButtonState();
+
+    // Aktualizacja Wykresu
+    const now = new Date().toLocaleTimeString();
+    processChart.data.labels.push(now);
+    processChart.data.datasets[0].data.push(getSafeValue(temperatures, 'Temp_Keg'));
+    processChart.data.datasets[1].data.push(getSafeValue(temperatures, 'Temp_Bufor'));
+    processChart.data.datasets[2].data.push(getSafeValue(temperatures, 'Temp_10p'));
+    processChart.data.datasets[3].data.push(getSafeValue(temperatures, 'Temp_Glowica'));
+    processChart.data.datasets[4].data.push(getSafeValue(temperatures, 'Temp_Woda'));
+    
+    const mainPowerObject = getSafeObject(data, 'power');
+    let mainPowerData = getSafeValue(mainPowerObject, 'power');
+
+    if (mainPowerData === null) {
+        const firstDeviceKey = Object.keys(powerByDevice)[0];
+        const firstDevice = firstDeviceKey ? powerByDevice[firstDeviceKey] : null;
+        mainPowerData = getSafeValue(firstDevice, 'power');
+    }
+
+    processChart.data.datasets[5].data.push(mainPowerData);
+
+    if (processChart.data.labels.length > 120) {
+        processChart.data.labels.shift();
+        processChart.data.datasets.forEach(d => d.data.shift());
+    }
+    processChart.update();
+
+    // Lampka zaworu
+    const lamp = document.getElementById('valve_range_lamp');
+    const text = document.getElementById('valve_range_text');
+    const inRange = !!(getSafeValue(data, 'isValveEnabled')); 
+
+    lamp.classList.remove('status-lamp-green', 'status-lamp-red');
+    lamp.classList.add(inRange ? 'status-lamp-green' : 'status-lamp-red');
+    text.innerText = inRange ? "ZAŁĄCZONY" : "WYŁĄCZONY";
+
+    // Heartbeat
+    heartbeatEnabled = !!(getSafeValue(data, 'isHeartbeatReceptionEnabled'));
+    setHeartbeatButtonState();
+});
 
         async function loadCalibrations() {
             try {
@@ -783,7 +837,7 @@
 
                 Object.keys(correctionMap).forEach(sensor => renderCorrection(sensor));
             } catch (err) {
-                console.error("Błąd pobierania korekt:", err);
+                console.error("Błąd pobierania korekty:", err);
             }
         }
 
@@ -820,6 +874,7 @@
             setInterval(loadWeather, 300000); // co 5 min
         }
 
+        // Initialize dashboard - DODANE
         initializeDashboard();
 
         async function sendCorrection(sensorName, offsetValue) {
@@ -863,6 +918,20 @@
             } catch (err) {
                 console.error("Błąd pobierania pogody:", err);
             }
+        }
+
+        // Helpers
+        function getRenderedEnergyDevices() {
+            return Array.from(document.querySelectorAll('[id^="val_voltage_"]'))
+                .map(el => el.id.replace('val_voltage_', ''))
+                .filter(x => !!x);
+        }
+
+        function findDevicePayload(powerByDevice, renderedName) {
+            if (!powerByDevice || !renderedName) return null;
+            const target = renderedName.trim().toLowerCase();
+            const key = Object.keys(powerByDevice).find(k => k.trim().toLowerCase() === target);
+            return key ? powerByDevice[key] : null;
         }
 
         const correctionMap = {
@@ -955,6 +1024,8 @@
                 setHeartbeatButtonState();
             }
         }
+
+        initializeDashboard();
     </script>
 </body>
 </html>

@@ -98,13 +98,7 @@
                                     {
                                         if (deviceConfig.Tuya is not null)
                                         {
-                                            var tuyaSources = new Dictionary<string, DeviceItemConfig?>(StringComparer.OrdinalIgnoreCase)
-                                            {
-                                                ["Column"] = deviceConfig.Tuya.GetValueOrDefault("Column"),
-                                                ["Pump"] = deviceConfig.Tuya.GetValueOrDefault("Pump")
-                                            };
-
-                                            foreach (var deviceEntry in tuyaSources)
+                                            foreach (var deviceEntry in deviceConfig.Tuya)
                                             {
                                                 var deviceName = deviceEntry.Key;
                                                 var deviceId = deviceEntry.Value?.DeviceId;
