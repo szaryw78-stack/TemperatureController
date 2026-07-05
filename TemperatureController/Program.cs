@@ -31,7 +31,11 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
-app.UseHttpsRedirection();
+var hasHttpsEndpointConfigured = !string.IsNullOrWhiteSpace(app.Configuration["Kestrel:Endpoints:Https:Url"]);
+if (hasHttpsEndpointConfigured)
+{
+    app.UseHttpsRedirection();
+}
 app.UseRouting();
 app.UseAuthorization();
 

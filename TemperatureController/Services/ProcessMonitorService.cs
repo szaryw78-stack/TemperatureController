@@ -1,5 +1,6 @@
 ﻿namespace TemperatureController.Services
 {
+    using Microsoft.Extensions.Hosting;
     using Microsoft.AspNetCore.SignalR;
     using System.Text.Json;
     using TemperatureController.Models;
@@ -12,6 +13,7 @@
         private readonly IWeatherService _weatherService;
         private readonly IHubContext<DashboardHub> _hubContext;
         private readonly ProcessStateManager _state;
+        private readonly string _configFilePath;
         private DateTime _lastCsvLog = DateTime.MinValue;
         private DateTime _lastTuyaRefresh = DateTime.MinValue;
         private PowerMetrics _cachedPower = new PowerMetrics(); // Pamięć podręczna
@@ -32,18 +34,21 @@
         /// <param name="weatherService">Weather service.</param>
         /// <param name="hub">SignalR hub context.</param>
         /// <param name="state">Shared process state.</param>
+        /// <param name="environment">Host environment used to resolve configuration path.</param>
         public ProcessMonitorService(
             HardwareService hardware,
             ITuyaService tuya,
             IWeatherService weatherService,
             IHubContext<DashboardHub> hub,
-            ProcessStateManager state) // Wstrzykujemy naszego zarządcę stanu
+            ProcessStateManager state,
+            IHostEnvironment environment)
         {
             _hardware = hardware;
             _tuya = tuya;
             _weatherService = weatherService;
             _hubContext = hub;
             _state = state;
+            _configFilePath = Path.Combine(environment.ContentRootPath, "deviceconfiguration.json");
         }
 
         /// <summary>
@@ -57,7 +62,7 @@
                             {
                                 try
                                 {
-                                    var configData = await File.ReadAllTextAsync("deviceconfiguration.json", stoppingToken);
+                                    var configData = await File.ReadAllTextAsync(_configFilePath, stoppingToken);
                                     var deviceConfig = JsonSerializer.Deserialize<DynamicConfig>(configData)
                                         ?? throw new InvalidOperationException("Invalid deviceconfiguration.json.");
 

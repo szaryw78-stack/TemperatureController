@@ -618,6 +618,15 @@
             }
         }
 
+        function formatValue(value, digits, unit) {
+            const number = typeof value === 'number' && isFinite(value) ? value : null;
+            if (number === null) {
+                return `-- ${unit}`;
+            }
+
+            return `${number.toFixed(digits)} ${unit}`;
+        }
+
         const ctx = document.getElementById('processChart').getContext('2d');
         const processChart = new Chart(ctx, {
             type: 'line',
@@ -699,13 +708,15 @@
         const activeDevices = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(visibleDevices));
 
         connection.on("ReceiveProcessData", function (data) {
-            if (data.temperatures) {
-                document.getElementById('val_temp_keg').innerText = data.temperatures['Temp_Keg']?.toFixed(2) + " °C";
-                document.getElementById('val_temp_bufor').innerText = data.temperatures['Temp_Bufor']?.toFixed(2) + " °C";
-                document.getElementById('val_temp_10p').innerText = data.temperatures['Temp_10p']?.toFixed(2) + " °C";
-                document.getElementById('val_temp_glowica').innerText = data.temperatures['Temp_Glowica']?.toFixed(2) + " °C";
-                document.getElementById('val_temp_woda').innerText = data.temperatures['Temp_Woda']?.toFixed(2) + " °C";
-            }
+            const temperatures = data && data.temperatures ? data.temperatures : {};
+            const powerByDevice = data && data.powerByDevice ? data.powerByDevice : {};
+            const mainPower = data && data.power ? data.power : {};
+
+            document.getElementById('val_temp_keg').innerText = formatValue(temperatures['Temp_Keg'], 2, '°C');
+            document.getElementById('val_temp_bufor').innerText = formatValue(temperatures['Temp_Bufor'], 2, '°C');
+            document.getElementById('val_temp_10p').innerText = formatValue(temperatures['Temp_10p'], 2, '°C');
+            document.getElementById('val_temp_glowica').innerText = formatValue(temperatures['Temp_Glowica'], 2, '°C');
+            document.getElementById('val_temp_woda').innerText = formatValue(temperatures['Temp_Woda'], 2, '°C');
 
             // DYNAMICZNA OBSŁUGA DANYCH ENERGETYCZNYCH
             // if (data.power) {
@@ -727,17 +738,15 @@
             //         }
             //     });
             // }
-            if (data.power) {
-                activeDevices.forEach(dev => {
-                    const d = data.powerByDevice?.[dev];
-                    if (d) {
-                        document.getElementById('val_voltage_' + dev).innerText = (d.voltage || 0).toFixed(1) + " V";
-                        document.getElementById('val_current_' + dev).innerText = (d.current || 0).toFixed(2) + " A";
-                        document.getElementById('val_power_' + dev).innerText = (d.power || 0).toFixed(0) + " W";
-                        document.getElementById('val_energy_' + dev).innerText = (d.sessionEnergy || 0).toFixed(3) + " kWh";
-                    }
-                });
-            }
+            activeDevices.forEach(dev => {
+                const d = powerByDevice[dev];
+                if (d) {
+                    document.getElementById('val_voltage_' + dev).innerText = ((typeof d.voltage === 'number' ? d.voltage : 0)).toFixed(1) + " V";
+                    document.getElementById('val_current_' + dev).innerText = ((typeof d.current === 'number' ? d.current : 0)).toFixed(2) + " A";
+                    document.getElementById('val_power_' + dev).innerText = ((typeof d.power === 'number' ? d.power : 0)).toFixed(0) + " W";
+                    document.getElementById('val_energy_' + dev).innerText = ((typeof d.sessionEnergy === 'number' ? d.sessionEnergy : 0)).toFixed(3) + " kWh";
+                }
+            });
 
             // START TIME + DURATION
             document.getElementById('ui_duration').innerText = data.processDuration || "00:00:00";
@@ -753,12 +762,12 @@
             // LIVE points
             const now = new Date().toLocaleTimeString();
             processChart.data.labels.push(now);
-            processChart.data.datasets[0].data.push(data.temperatures?.Temp_Keg ?? null);
-            processChart.data.datasets[1].data.push(data.temperatures?.Temp_Bufor ?? null);
-            processChart.data.datasets[2].data.push(data.temperatures?.Temp_10p ?? null);
-            processChart.data.datasets[3].data.push(data.temperatures?.Temp_Glowica ?? null);
-            processChart.data.datasets[4].data.push(data.temperatures?.Temp_Woda ?? null);
-            processChart.data.datasets[5].data.push(data.power?.power ?? null);
+            processChart.data.datasets[0].data.push(typeof temperatures.Temp_Keg === 'number' ? temperatures.Temp_Keg : null);
+            processChart.data.datasets[1].data.push(typeof temperatures.Temp_Bufor === 'number' ? temperatures.Temp_Bufor : null);
+            processChart.data.datasets[2].data.push(typeof temperatures.Temp_10p === 'number' ? temperatures.Temp_10p : null);
+            processChart.data.datasets[3].data.push(typeof temperatures.Temp_Glowica === 'number' ? temperatures.Temp_Glowica : null);
+            processChart.data.datasets[4].data.push(typeof temperatures.Temp_Woda === 'number' ? temperatures.Temp_Woda : null);
+            processChart.data.datasets[5].data.push(typeof mainPower.power === 'number' ? mainPower.power : null);
 
             if (processChart.data.labels.length > 120) {
                 processChart.data.labels.shift();
@@ -824,6 +833,7 @@ setHeartbeatButtonState();
                 await updateFileName(fileName);
                 await loadCalibrations();
                 loadChartHistory();
+                await loadHeartbeatStatus();
 
                 setInterval(loadChartHistory, 15000);
 
@@ -973,8 +983,6 @@ async function toggleHeartbeat() {
         setHeartbeatButtonState();
     }
 }
-
-await loadHeartbeatStatus();
     </script>
 </body>
 </html>

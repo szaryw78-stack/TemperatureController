@@ -4,7 +4,7 @@
     "CsvLogIntervalMs": 6002,
     "ValveThresholdTempMin": 78.05,
     "ValveThresholdTempMax": 78.66,
-    "HeartbeatReceptionEnabled": true,
+    "HeartbeatReceptionEnabled": false,
     "Calibrations": {
       "Temp_Keg": 0,
       "Temp_Bufor": 0,
