@@ -41,17 +41,20 @@ namespace TemperatureController.Tuya
         /// <summary>
         /// Gets current power metrics from Tuya device status.
         /// </summary>
+        /// <param name="deviceId">Tuya device identifier.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>Mapped power metrics object.</returns>
         public async Task<PowerMetrics> GetPowerMetricsAsync(
             string deviceId,
             CancellationToken cancellationToken = default)
         {
-            if(string.IsNullOrWhiteSpace(deviceId))
+            if (string.IsNullOrWhiteSpace(deviceId))
             {
                 throw new ArgumentException("Tuya deviceId is required.", nameof(deviceId));
             }
 
-            var token = await GetAccessTokenAsync();
+            // Access token is required by Tuya for device status endpoint.
+            var token = await GetAccessTokenAsync(cancellationToken);
 
             var path = $"/v1.0/devices/{deviceId}/status";
             var timestamp = GetTimestampMs();
@@ -73,7 +76,7 @@ namespace TemperatureController.Tuya
             var dto = JsonSerializer.Deserialize<TuyaStatusResponse>(raw, _jsonOptions) ??
                 throw new InvalidOperationException("Invalid Tuya status response.");
 
-            if(!dto.Success || dto.Result is null)
+            if (!dto.Success || dto.Result is null)
             {
                 throw new InvalidOperationException($"Tuya status error: {dto.Msg}");
             }

@@ -6,6 +6,9 @@
     using TemperatureController.Models;
     using TemperatureController.Tuya;
 
+    /// <summary>
+    /// Runs background process monitoring, device control and dashboard data publishing.
+    /// </summary>
     public class ProcessMonitorService : BackgroundService
     {
         private readonly HardwareService _hardware;
@@ -235,15 +238,19 @@
             return pumpEntry.Value?.DeviceId;
         }
 
+        /// <summary>
+        /// Builds payload from the latest CSV row.
+        /// </summary>
+        /// <returns>Last known process payload, or empty payload when file is missing/invalid.</returns>
         private ProcessLogPayload GetPayloadFromFile()
         {
             var fileName = _state.CurrentFileName;
             if (!fileName.EndsWith(".csv")) fileName += ".csv";
-            if (!File.Exists(fileName)) return new ProcessLogPayload(); // Pusty obiekt, jeśli brak pliku
+            if (!File.Exists(fileName)) return new ProcessLogPayload(); // No file -> no historical payload.
 
             try
             {
-                // Odczytujemy wszystkie linie i bierzemy ostatnią (niepustą)
+                // Read latest non-empty row to restore last known values.
                 var lines = File.ReadAllLines(fileName);
                 var lastLine = lines.LastOrDefault(l => !string.IsNullOrWhiteSpace(l));
                 if (lastLine == null) return new ProcessLogPayload();
@@ -255,13 +262,14 @@
 
                 return new ProcessLogPayload
                 {
-                    Temperatures = new Dictionary<string, double> {
-                { "Temp_Keg", double.Parse(parts[2], culture) },
-                { "Temp_Bufor", double.Parse(parts[3], culture) },
-                { "Temp_10p", double.Parse(parts[4], culture) },
-                { "Temp_Glowica", double.Parse(parts[5], culture) },
-                { "Temp_Woda", double.Parse(parts[6], culture) }
-            },
+                    Temperatures = new Dictionary<string, double>
+                    {
+                        { "Temp_Keg", double.Parse(parts[2], culture) },
+                        { "Temp_Bufor", double.Parse(parts[3], culture) },
+                        { "Temp_10p", double.Parse(parts[4], culture) },
+                        { "Temp_Glowica", double.Parse(parts[5], culture) },
+                        { "Temp_Woda", double.Parse(parts[6], culture) }
+                    },
                     Power = new TemperatureController.Tuya.PowerMetrics
                     {
                         Voltage = double.Parse(parts[7], culture),
@@ -279,6 +287,11 @@
                 return new ProcessLogPayload();
             }
         }
+
+        /// <summary>
+        /// Appends a single process row to CSV file, ensuring header compatibility.
+        /// </summary>
+        /// <param name="payload">Current process snapshot to persist.</param>
         private void SaveToCsv(ProcessLogPayload payload)
         {
             try
@@ -346,128 +359,187 @@
         }
 
         /// <summary>
-/// Ensures CSV header is up to date and migrates legacy rows to new column layout.
-/// </summary>
-/// <param name="fileName">CSV file path.</param>
-private void EnsureCsvHeader(string fileName)
-{
-    if (!File.Exists(fileName))
-    {
-        File.WriteAllText(fileName, CsvHeader + Environment.NewLine);
-        return;
-    }
-
-    var lines = File.ReadAllLines(fileName).ToList();
-    if (lines.Count == 0)
-    {
-        File.WriteAllText(fileName, CsvHeader + Environment.NewLine);
-        return;
-    }
-
-    // Header already correct
-    if (string.Equals(lines[0], CsvHeader, StringComparison.Ordinal))
-    {
-        return;
-    }
-
-    // Replace old header and migrate old rows:
-    // OLD: 12 kolumn (bez pogody), NEW: 14 kolumn (z pogodą)
-    lines[0] = CsvHeader;
-    for (var i = 1; i < lines.Count; i++)
-    {
-        if (string.IsNullOrWhiteSpace(lines[i])) continue;
-
-        var parts = lines[i].Split(';');
-
-        // stary format 12 kolumn (bez pogody i bez zaworu)
-        if (parts.Length == 12)
+        /// Ensures CSV header is up to date and migrates legacy rows to new column layout.
+        /// </summary>
+        /// <param name="fileName">CSV file path.</param>
+        private void EnsureCsvHeader(string fileName)
         {
-            var migrated = parts.Take(11).Concat(new[] { "", "", "", parts[11] });
-            lines[i] = string.Join(';', migrated);
-        }
-        // stary format 14 kolumn (z pogodą, bez zaworu)
-        else if (parts.Length == 14)
-        {
-            var migrated = parts.Take(13).Concat(new[] { "", parts[13] });
-            lines[i] = string.Join(';', migrated);
-        }
-    }
+            if (!File.Exists(fileName))
+            {
+                // Create new file with expected header when file does not exist yet.
+                File.WriteAllText(fileName, CsvHeader + Environment.NewLine);
+                return;
+            }
 
-    File.WriteAllLines(fileName, lines);
-}
+            var lines = File.ReadAllLines(fileName).ToList();
+            if (lines.Count == 0)
+            {
+                // Initialize header when file exists but is empty.
+                File.WriteAllText(fileName, CsvHeader + Environment.NewLine);
+                return;
+            }
+
+            // Header already correct -> no migration needed.
+            if (string.Equals(lines[0], CsvHeader, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            // Replace old header and migrate old rows:
+            // OLD: 12 columns (without weather and valve), NEW: 15 columns.
+            lines[0] = CsvHeader;
+            for (var i = 1; i < lines.Count; i++)
+            {
+                if (string.IsNullOrWhiteSpace(lines[i]))
+                {
+                    continue;
+                }
+
+                var parts = lines[i].Split(';');
+
+                // Legacy format: 12 columns (without weather and valve).
+                if (parts.Length == 12)
+                {
+                    var migrated = parts.Take(11).Concat(new[] { "", "", "", parts[11] });
+                    lines[i] = string.Join(';', migrated);
+                }
+                // Legacy format: 14 columns (with weather, without valve).
+                else if (parts.Length == 14)
+                {
+                    var migrated = parts.Take(13).Concat(new[] { "", parts[13] });
+                    lines[i] = string.Join(';', migrated);
+                }
+            }
+
+            File.WriteAllLines(fileName, lines);
+        }
+
         /// <summary>
-/// Resolves process start time from the oldest data record in CSV file.
-/// </summary>
-/// <param name="baseFileName">Base file name from process state.</param>
-/// <returns>Start timestamp from first data row or null when unavailable.</returns>
-private static DateTime? ResolveProcessStartTime(string baseFileName)
-{
-    var fileName = baseFileName;
-    if (!fileName.EndsWith(".csv", StringComparison.OrdinalIgnoreCase))
-    {
-        fileName += ".csv";
+        /// Resolves process start time from the oldest data record in CSV file.
+        /// </summary>
+        /// <param name="baseFileName">Base file name from process state.</param>
+        /// <returns>Start timestamp from first data row or null when unavailable.</returns>
+        private static DateTime? ResolveProcessStartTime(string baseFileName)
+        {
+            var fileName = baseFileName;
+            if (!fileName.EndsWith(".csv", StringComparison.OrdinalIgnoreCase))
+            {
+                fileName += ".csv";
+            }
+
+            if (!File.Exists(fileName))
+            {
+                return null;
+            }
+
+            using var stream = new FileStream(fileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            using var reader = new StreamReader(stream);
+
+            _ = reader.ReadLine(); // Skip header.
+
+            string? line;
+            while ((line = reader.ReadLine()) != null)
+            {
+                if (string.IsNullOrWhiteSpace(line))
+                {
+                    continue;
+                }
+
+                var parts = line.Split(';');
+                if (parts.Length == 0)
+                {
+                    continue;
+                }
+
+                // Prefer strict expected date format from CSV first column.
+                if (DateTime.TryParseExact(
+                        parts[0],
+                        "yyyy-MM-dd HH:mm:ss",
+                        System.Globalization.CultureInfo.InvariantCulture,
+                        System.Globalization.DateTimeStyles.AssumeLocal,
+                        out var parsed))
+                {
+                    return parsed;
+                }
+
+                // Fallback for backward compatibility with older date formats.
+                if (DateTime.TryParse(parts[0], out parsed))
+                {
+                    return parsed;
+                }
+            }
+
+            return null;
+        }
     }
 
-    if (!File.Exists(fileName))
-    {
-        return null;
-    }
-
-    using var stream = new FileStream(fileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-    using var reader = new StreamReader(stream);
-
-    _ = reader.ReadLine(); // header
-
-    string? line;
-    while ((line = reader.ReadLine()) != null)
-    {
-        if (string.IsNullOrWhiteSpace(line))
-        {
-            continue;
-        }
-
-        var parts = line.Split(';');
-        if (parts.Length == 0)
-        {
-            continue;
-        }
-
-        if (DateTime.TryParseExact(
-                parts[0],
-                "yyyy-MM-dd HH:mm:ss",
-                System.Globalization.CultureInfo.InvariantCulture,
-                System.Globalization.DateTimeStyles.AssumeLocal,
-                out var parsed))
-        {
-            return parsed;
-        }
-
-        if (DateTime.TryParse(parts[0], out parsed))
-        {
-            return parsed;
-        }
-    }
-
-    return null;
-}
-    }
+    /// <summary>
+    /// SignalR hub for real-time dashboard updates.
+    /// </summary>
     public class DashboardHub : Hub
     {
-        // Klasa może pozostać pusta. 
-        // Metody dodajemy tu tylko, jeśli chcemy wysyłać komendy z przeglądarki bez użycia REST API.
+        // Hub is intentionally empty.
+        // Browser-to-server commands can be added here in future when needed.
     }
+
+    /// <summary>
+    /// Represents a single dashboard/process snapshot sent to clients and CSV logger.
+    /// </summary>
     public class ProcessLogPayload
     {
+        /// <summary>
+        /// Gets or sets process temperatures by logical sensor name.
+        /// </summary>
         public Dictionary<string, double> Temperatures { get; set; } = new();
+
+        /// <summary>
+        /// Gets or sets main power metrics displayed on dashboard.
+        /// </summary>
         public PowerMetrics Power { get; set; } = new();
+
+        /// <summary>
+        /// Gets or sets power metrics grouped by Tuya device name.
+        /// </summary>
         public Dictionary<string, PowerMetrics> PowerByDevice { get; set; } = new();
+
+        /// <summary>
+        /// Gets or sets a value indicating whether process recording is active.
+        /// </summary>
         public bool IsRecording { get; set; }
+
+        /// <summary>
+        /// Gets or sets current process duration string in <c>hh:mm:ss</c> format.
+        /// </summary>
         public string ProcessDuration { get; set; } = "00:00:00";
+
+        /// <summary>
+        /// Gets or sets current output file name.
+        /// </summary>
         public string FileName { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Gets or sets formatted process start time string.
+        /// </summary>
         public string StartTimeStr { get; set; } = "--:--:--";
+
+        /// <summary>
+        /// Gets or sets current outdoor temperature in Celsius.
+        /// </summary>
         public double WeatherTemperatureC { get; set; }
+
+        /// <summary>
+        /// Gets or sets current atmospheric pressure in hPa.
+        /// </summary>
         public double WeatherPressureHpa { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether valve is currently enabled.
+        /// </summary>
         public bool IsValveEnabled { get; set; }
-        public bool IsHeartbeatReceptionEnabled { get; set; } // Dodane pole
+
+        /// <summary>
+        /// Gets or sets a value indicating whether heartbeat reception is enabled.
+        /// </summary>
+        public bool IsHeartbeatReceptionEnabled { get; set; }
     }
 }
