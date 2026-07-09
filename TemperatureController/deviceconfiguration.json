@@ -9,9 +9,9 @@
     "Calibrations": {
       "Temp_Keg": 0,
       "Temp_Bufor": 0,
-      "Temp_10p": 0,
-      "Temp_Glowica": 0,
-      "Temp_Woda": 0
+      "Temp_10p": 0.15,
+      "Temp_Glowica": 0.1,
+      "Temp_Woda": 0.25
     },
     "TuyaRefreshIntervalSec": 5,
     "CoolingWaterStart": 20,
