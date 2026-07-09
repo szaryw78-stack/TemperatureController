@@ -349,7 +349,7 @@
 <body>
 
     <div class="app-header">
-        &nbsp;&nbsp;&nbsp; Raspberry Pi 3 - Proces Rektyfikacji
+        &nbsp;&nbsp;&nbsp; Raspberry Pi 5 - Proces Rektyfikacji
     </div>
 
     <div class="container">
@@ -774,99 +774,6 @@
             setHeartbeatButtonState();
         });
 
-        async function loadCalibrations() {
-            try {
-                const response = await fetch('/api/config/calibrations');
-                if (!response.ok) throw new Error('HTTP error');
-                const c = await response.json();
-
-                correctionMap.Temp_Keg.value = getSafeValue(c, 'temp_Keg') ?? 0;
-                correctionMap.Temp_Bufor.value = getSafeValue(c, 'temp_Bufor') ?? 0;
-                correctionMap.Temp_10p.value = getSafeValue(c, 'temp_10p') ?? 0;
-                correctionMap.Temp_Glowica.value = getSafeValue(c, 'temp_Glowica') ?? 0;
-                correctionMap.Temp_Woda.value = getSafeValue(c, 'temp_Woda') ?? 0;
-
-                Object.keys(correctionMap).forEach(sensor => renderCorrection(sensor));
-            } catch (err) {
-                console.error("Błąd pobierania korekty:", err);
-            }
-        }
-
-        async function updateFileName(newName) {
-            const response = await fetch('/api/process/set-filename', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: newName })
-            });
-            if (!response.ok) throw new Error("Nie udało się ustawić nazwy pliku.");
-        }
-
-        async function initializeDashboard() {
-            setToggleButtonState();
-            setHeartbeatButtonState();
-
-            const fileName = document.getElementById('ui_filename').value;
-
-            try { await updateFileName(fileName); } catch (err) { console.warn(err); }
-            try { await loadCalibrations(); } catch (err) { console.warn(err); }
-            try { await loadHeartbeatStatus(); } catch (err) { console.warn(err); }
-
-            loadChartHistory();
-            setInterval(loadChartHistory, 15000);
-
-            try {
-                await connection.start();
-                console.log("SignalR Połączony poprawnie.");
-            } catch (err) {
-                console.error("Nie udało się uruchomić połączenia SignalR:", err);
-            }
-
-            try { await loadWeather(); } catch (err) { console.warn(err); }
-            setInterval(loadWeather, 300000); 
-        }
-
-        async function sendCorrection(sensorName, offsetValue) {
-            try {
-                await fetch('/api/config/update-calibration', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ sensorName: sensorName, offset: parseFloat(offsetValue) })
-                });
-            } catch (err) { console.error("Błąd aktualizacji korekty:", err); }
-        }
-
-        async function updateComment(commentText) {
-            try {
-                const response = await fetch('/api/process/comment', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ comment: commentText ?? "" })
-                });
-                if (!response.ok) throw new Error("HTTP error");
-            } catch (err) { console.error("Błąd aktualizacji komentarza:", err); }
-        }
-
-        async function loadWeather() {
-            try {
-                const response = await fetch('/api/weather/current');
-                if (!response.ok) throw new Error('HTTP error');
-                
-                const weather = await response.json();
-                
-                const tempKey = Object.keys(weather).find(k => k.toLowerCase().includes('temp'));
-                const pressKey = Object.keys(weather).find(k => k.toLowerCase().includes('press'));
-                
-                if(tempKey && weather[tempKey] !== null) {
-                    document.getElementById('val_weather_temp').innerText = `${Number(weather[tempKey]).toFixed(1)} °C`;
-                }
-                if(pressKey && weather[pressKey] !== null) {
-                    document.getElementById('val_weather_pressure').innerText = `${Number(weather[pressKey]).toFixed(1)} hPa`;
-                }
-            } catch (err) {
-                console.error("Błąd pobierania pogody:", err);
-            }
-        }
-
         function getRenderedEnergyDevices() {
             return Array.from(document.querySelectorAll('[id^="val_voltage_"]'))
                 .map(el => el.id.replace('val_voltage_', ''))
@@ -880,34 +787,24 @@
             return key ? powerByDevice[key] : null;
         }
 
-        const correctionMap = {
-            Temp_Keg: { valueEl: 'corr_temp_keg', value: 0 },
-            Temp_Bufor: { valueEl: 'corr_temp_bufor', value: 0 },
-            Temp_10p: { valueEl: 'corr_temp_10p', value: 0 },
-            Temp_Glowica: { valueEl: 'corr_temp_glowica', value: 0 },
-            Temp_Woda: { valueEl: 'corr_temp_woda', value: 0 }
-        };
+        async function loadWeather() {
+            try {
+                const response = await fetch('/api/weather/current');
+                if (!response.ok) throw new Error('HTTP error');
 
-        function renderCorrection(sensorName) {
-            const c = correctionMap[sensorName];
-            if (c) document.getElementById(c.valueEl).innerText = c.value.toFixed(2);
-        }
+                const weather = await response.json();
+                const tempKey = Object.keys(weather).find(k => k.toLowerCase().includes('temp'));
+                const pressKey = Object.keys(weather).find(k => k.toLowerCase().includes('press'));
 
-        async function changeCorrection(valueEl, delta) {
-            const sensorNameMap = {
-                corr_temp_keg: "Temp_Keg",
-                corr_temp_bufor: "Temp_Bufor",
-                corr_temp_10p: "Temp_10p",
-                corr_temp_glowica: "Temp_Glowica",
-                corr_temp_woda: "Temp_Woda"
-            };
-
-            const sensorName = sensorNameMap[valueEl];
-            const c = correctionMap[sensorName];
-
-            c.value = Math.max(-15, Math.min(15, +(c.value + delta).toFixed(2)));
-            renderCorrection(sensorName);
-            await sendCorrection(sensorName, c.value);
+                if (tempKey && weather[tempKey] !== null) {
+                    document.getElementById('val_weather_temp').innerText = `${Number(weather[tempKey]).toFixed(1)} °C`;
+                }
+                if (pressKey && weather[pressKey] !== null) {
+                    document.getElementById('val_weather_pressure').innerText = `${Number(weather[pressKey]).toFixed(1)} hPa`;
+                }
+            } catch (err) {
+                console.error("Błąd pobierania pogody:", err);
+            }
         }
 
         let heartbeatEnabled = false;
@@ -968,6 +865,116 @@
                 heartbeatToggleInProgress = false;
                 setHeartbeatButtonState();
             }
+        }
+
+        async function loadCalibrations() {
+            try {
+                const response = await fetch('/api/config/calibrations');
+                if (!response.ok) throw new Error('HTTP error');
+                const c = await response.json();
+
+                correctionMap.Temp_Keg.value = getSafeValue(c, 'temp_Keg') ?? 0;
+                correctionMap.Temp_Bufor.value = getSafeValue(c, 'temp_Bufor') ?? 0;
+                correctionMap.Temp_10p.value = getSafeValue(c, 'temp_10p') ?? 0;
+                correctionMap.Temp_Glowica.value = getSafeValue(c, 'temp_Glowica') ?? 0;
+                correctionMap.Temp_Woda.value = getSafeValue(c, 'temp_Woda') ?? 0;
+
+                Object.keys(correctionMap).forEach(sensor => renderCorrection(sensor));
+            } catch (err) {
+                console.error("Błąd pobierania korekty:", err);
+            }
+        }
+
+        const correctionMap = {
+            Temp_Keg: { valueEl: 'corr_temp_keg', value: 0 },
+            Temp_Bufor: { valueEl: 'corr_temp_bufor', value: 0 },
+            Temp_10p: { valueEl: 'corr_temp_10p', value: 0 },
+            Temp_Glowica: { valueEl: 'corr_temp_glowica', value: 0 },
+            Temp_Woda: { valueEl: 'corr_temp_woda', value: 0 }
+        };
+
+        function renderCorrection(sensorName) {
+            const c = correctionMap[sensorName];
+            if (c) {
+                document.getElementById(c.valueEl).innerText = c.value.toFixed(2);
+            }
+        }
+
+        async function sendCorrection(sensorName, offsetValue) {
+            try {
+                await fetch('/api/config/update-calibration', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sensorName: sensorName, offset: parseFloat(offsetValue) })
+                });
+            } catch (err) {
+                console.error("Błąd aktualizacji korekty:", err);
+            }
+        }
+
+        async function changeCorrection(valueEl, delta) {
+            const sensorNameMap = {
+                corr_temp_keg: "Temp_Keg",
+                corr_temp_bufor: "Temp_Bufor",
+                corr_temp_10p: "Temp_10p",
+                corr_temp_glowica: "Temp_Glowica",
+                corr_temp_woda: "Temp_Woda"
+            };
+
+            const sensorName = sensorNameMap[valueEl];
+            const c = correctionMap[sensorName];
+            if (!c) {
+                return;
+            }
+
+            c.value = Math.max(-15, Math.min(15, +(c.value + delta).toFixed(2)));
+            renderCorrection(sensorName);
+            await sendCorrection(sensorName, c.value);
+        }
+
+        async function updateFileName(newName) {
+            const response = await fetch('/api/process/set-filename', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: newName })
+            });
+            if (!response.ok) throw new Error("Nie udało się ustawić nazwy pliku.");
+        }
+
+        async function loadFileName() {
+            const response = await fetch('/api/process/filename');
+            if (!response.ok) throw new Error("Nie udało się pobrać nazwy pliku.");
+
+            const data = await response.json();
+            const input = document.getElementById('ui_filename');
+            if (input && data && data.name) {
+                input.value = data.name;
+            }
+        }
+
+        async function initializeDashboard() {
+            setToggleButtonState();
+            setHeartbeatButtonState();
+
+            // WAŻNE: nie zapisuj nazwy pliku przy starcie strony
+            // (to nadpisywało config po wejściu z innego urządzenia).
+            try { await loadFileName(); } catch (err) { console.warn(err); }
+
+            try { await loadCalibrations(); } catch (err) { console.warn(err); }
+            try { await loadHeartbeatStatus(); } catch (err) { console.warn(err); }
+
+            loadChartHistory();
+            setInterval(loadChartHistory, 15000);
+
+            try {
+                await connection.start();
+                console.log("SignalR Połączony poprawnie.");
+            } catch (err) {
+                console.error("Nie udało się uruchomić połączenia SignalR:", err);
+            }
+
+            try { await loadWeather(); } catch (err) { console.warn(err); }
+            setInterval(loadWeather, 300000);
         }
 
         initializeDashboard();

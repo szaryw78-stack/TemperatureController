@@ -86,7 +86,6 @@
 
                     // ADD: pump ON when Temp_Keg > CoolingWaterStart
                     var tempKeg = temps["Temp_Keg"];
-                    tempKeg = 25;//test
                     if (tempKeg > cfg.CoolingWaterStart)
                     {
                         var pumpDeviceId = GetPumpDeviceId(deviceConfig);

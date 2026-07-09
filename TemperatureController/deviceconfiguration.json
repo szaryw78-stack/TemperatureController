@@ -4,8 +4,8 @@
     "CsvLogIntervalSec": 6,
     "ValveThresholdTempMin": 29,
     "ValveThresholdTempMax": 35,
-    "HeartbeatReceptionEnabled": false,
-    "ProcessFileName": "Log_Procesu01.csv",
+    "HeartbeatReceptionEnabled": true,
+    "ProcessFileName": "Log_Procesu013.csv",
     "Calibrations": {
       "Temp_Keg": 0,
       "Temp_Bufor": 0,
