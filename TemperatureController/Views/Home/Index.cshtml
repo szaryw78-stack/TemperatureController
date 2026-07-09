@@ -20,6 +20,11 @@
             --fiori-red: #BB0000;
         }
 
+        /* --- Zmiana: box-sizing ułatwia zarządzanie szerokością --- */
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+
         body {
             font-family: "72", "Helvetica Neue", Helvetica, Arial, sans-serif;
             background-color: var(--fiori-bg);
@@ -32,7 +37,7 @@
         .app-header {
             background-color: var(--fiori-blue);
             color: white;
-            padding: 10px 20px;
+            padding: 15px 20px; /* Zmiana: lekko powiększony padding dla dotyku */
             display: flex;
             align-items: center;
             font-size: 18px;
@@ -50,7 +55,7 @@
         .control-panel {
             background-color: var(--fiori-card-bg);
             border: 1px solid var(--fiori-border);
-            border-radius: 4px;
+            border-radius: 6px;
             padding: 20px;
             margin-bottom: 20px;
             box-shadow: 0 1px 2px rgba(0,0,0,0.05);
@@ -61,6 +66,8 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 15px;
+            flex-wrap: wrap; /* Zmiana: pozwala na przełamanie wiersza na mniejszych ekranach */
+            gap: 15px;       /* Zmiana: spójny odstęp między elementami */
         }
 
         .control-item {
@@ -69,8 +76,17 @@
             gap: 10px;
         }
 
+        /* Klasa pomocnicza dla układów pionowych (np. input z etykietą) */
+        .control-item-col {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 8px;
+            width: 100%;
+        }
+
         .btn {
-            padding: 10px 20px;
+            padding: 12px 20px; /* Zmiana: wyższe przyciski łatwiejsze do klikania */
             border: none;
             border-radius: 4px;
             color: white;
@@ -78,6 +94,9 @@
             cursor: pointer;
             font-size: 14px;
             transition: background-color 0.2s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
 
         .btn-start { background-color: var(--fiori-blue); }
@@ -91,25 +110,26 @@
         }
 
         input[type="text"] {
-            padding: 8px;
+            padding: 10px;
             border: 1px solid var(--fiori-border);
             border-radius: 4px;
-            width: 300px;
+            width: 100%; /* Zmiana: usunięto sztywne 300px, wpisano 100% szerokości kontenera */
+            max-width: 800px;
+            font-size: 16px; /* Zmiana: min. 16px zapobiega automatycznemu przybliżaniu na iOS Safari */
         }
-        
-        .comment-box { width: 100%; max-width: 800px; }
 
         /* --- Sekcje (Kafelki) --- */
         .section-title {
-            font-size: 16px;
+            font-size: 18px;
             font-weight: bold;
-            margin: 20px 0 10px 0;
+            margin: 25px 0 15px 0;
             color: var(--fiori-text);
         }
 
         .tiles-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            /* Zmiana: Dynamiczne dopasowanie od 150px wzwyż, na małych tel ustawi 2 obok siebie lub 1 */
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 15px;
             margin-bottom: 20px;
         }
@@ -117,7 +137,7 @@
         .tile {
             background-color: var(--fiori-card-bg);
             border: 1px solid var(--fiori-border);
-            border-radius: 4px;
+            border-radius: 6px;
             padding: 15px;
             box-shadow: 0 1px 2px rgba(0,0,0,0.05);
             display: flex;
@@ -129,10 +149,11 @@
             font-size: 14px;
             color: #666;
             margin-bottom: 10px;
+            font-weight: bold;
         }
 
         .tile-value {
-            font-size: 32px;
+            font-size: 28px; /* Zmiana: Delikatnie mniejsze kafelki by mieściły się na mobile */
             font-weight: normal;
             margin-bottom: 15px;
         }
@@ -141,172 +162,188 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            font-size: 12px;
+            font-size: 13px;
             border-top: 1px solid #eee;
             padding-top: 10px;
             margin-top: auto;
-        }
-
-        .correction-input {
-            width: 60px;
-            padding: 4px;
-            text-align: right;
-            border: 1px solid var(--fiori-border);
         }
 
         /* --- Wykres --- */
         .chart-container {
             background-color: var(--fiori-card-bg);
             border: 1px solid var(--fiori-border);
-            border-radius: 4px;
-            padding: 20px;
+            border-radius: 6px;
+            padding: 15px;
             box-shadow: 0 1px 2px rgba(0,0,0,0.05);
             height: 400px;
+            position: relative; /* Ważne dla Chart.js */
         }
 
         .d-none { display: none; }
 
         .spinner {
-            width: 14px;
-            height: 14px;
+            width: 16px;
+            height: 16px;
             border: 2px solid rgba(255, 255, 255, 0.4);
             border-top-color: #fff;
             border-radius: 50%;
             display: inline-block;
             animation: spin .8s linear infinite;
-            margin-right: 6px;
+            margin-right: 8px;
             vertical-align: middle;
         }
 
-        @@keyframes spin {
-    100% { transform: rotate(360deg); }
-}
+        @@keyframes spin { 100% { transform: rotate(360deg); } }
 
-.correction-control {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-    }
+        .correction-control {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
 
-    .corr-btn {
-        width: 34px;
-        height: 34px;
-        border: 1px solid var(--fiori-border);
-        background: #fff;
-        border-radius: 6px;
-        font-size: 22px;
-        line-height: 1;
-        cursor: pointer;
-    }
+        .corr-btn {
+            width: 36px;
+            height: 36px;
+            border: 1px solid var(--fiori-border);
+            background: #f9f9f9;
+            border-radius: 6px;
+            font-size: 20px;
+            line-height: 1;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .corr-btn:active { background: #e0e0e0; }
 
-    .corr-value {
-        min-width: 68px;
-        text-align: center;
-        font-weight: 600;
-        border: 1px solid var(--fiori-border);
-        border-radius: 6px;
-        padding: 7px 6px;
-        background: #f8f8f8;
-    }
+        .corr-value {
+            min-width: 60px;
+            text-align: center;
+            font-weight: bold;
+            border: 1px solid var(--fiori-border);
+            border-radius: 6px;
+            padding: 8px 4px;
+            background: #fff;
+        }
 
-    .range-indicator {
-        display: inline-block;
-        width: 14px;
-        height: 14px;
-        border-radius: 50%;
-        border: 1px solid #999;
-        vertical-align: middle;
-    }
+        .status-lamp {
+            display: inline-block;
+            width: 24px; /* Zmiana: mniejsza lampka dla oszczędności miejsca */
+            height: 24px;
+            border-radius: 50%;
+            border: 1px solid #888;
+            margin-right: 8px;
+            vertical-align: middle;
+            background-color: #bbb;
+        }
 
-    .range-ok { background-color: var(--fiori-green); }
-    .range-out { background-color: var(--fiori-red); }
+        .status-lamp-green { background-color: var(--fiori-green); }
+        .status-lamp-red { background-color: var(--fiori-red); }
 
-    .status-lamp {
-        display: inline-block;
-        width: 34px;
-        height: 34px;
-        border-radius: 50%;
-        border: 1px solid #888;
-        margin-right: 8px;
-        vertical-align: middle;
-        background-color: #bbb;
-    }
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 56px;
+            height: 30px;
+            flex-shrink: 0;
+        }
 
-    .status-lamp-green { background-color: var(--fiori-green); }
-    .status-lamp-red { background-color: var(--fiori-red); }
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
 
-    .btn-toggle {
-    min-width: 220px;
-    padding: 10px 16px;
-    border: 1px solid var(--fiori-border);
-    border-radius: 999px;
-    background-color: #f3f3f3;
-    color: #333;
-    font-weight: 700;
-    cursor: pointer;
-    transition: all .2s ease;
-}
+        .slider {
+            position: absolute;
+            inset: 0;
+            cursor: pointer;
+            background-color: #c9c9c9;
+            transition: .25s;
+            border-radius: 30px;
+            border: 1px solid #aaa;
+        }
 
-.btn-toggle.is-on {
-    background-color: var(--fiori-green);
-    border-color: var(--fiori-green);
-    color: #fff;
-}
+        .slider::before {
+            content: "";
+            position: absolute;
+            height: 24px;
+            width: 24px;
+            left: 2px;
+            bottom: 2px;
+            background-color: #fff;
+            transition: .25s;
+            border-radius: 50%;
+            box-shadow: 0 1px 2px rgba(0,0,0,.2);
+        }
 
-.btn-toggle:disabled {
-    opacity: .7;
-    cursor: not-allowed;
-}
+        .switch input:checked + .slider {
+            background-color: var(--fiori-green);
+            border-color: var(--fiori-green);
+        }
 
-.switch {
-    position: relative;
-    display: inline-block;
-    width: 56px;
-    height: 30px;
-}
+        .switch input:checked + .slider::before {
+            transform: translateX(26px);
+        }
 
-.switch input {
-    opacity: 0;
-    width: 0;
-    height: 0;
-}
+        .switch input:disabled + .slider {
+            opacity: .6;
+            cursor: not-allowed;
+        }
 
-.slider {
-    position: absolute;
-    inset: 0;
-    cursor: pointer;
-    background-color: #c9c9c9;
-    transition: .25s;
-    border-radius: 30px;
-    border: 1px solid #aaa;
-}
+        /* ========================================= */
+        /* OPTYMALIZACJA DLA TELEFONÓW KOMÓRKOWYCH   */
+        /* ========================================= */
+        @@media (max-width: 768px) {
+            .container {
+                padding: 10px; /* Zmniejszony margines zew. */
+            }
 
-.slider::before {
-    content: "";
-    position: absolute;
-    height: 24px;
-    width: 24px;
-    left: 2px;
-    top: 2px;
-    background-color: #fff;
-    transition: .25s;
-    border-radius: 50%;
-    box-shadow: 0 1px 2px rgba(0,0,0,.2);
-}
+            .control-panel {
+                padding: 15px;
+            }
 
-.switch input:checked + .slider {
-    background-color: var(--fiori-green);
-    border-color: var(--fiori-green);
-}
+            .control-row {
+                flex-direction: column; /* Ustawienie elementów pionowo */
+                align-items: stretch;
+                gap: 15px;
+                margin-bottom: 10px;
+            }
 
-.switch input:checked + .slider::before {
-    transform: translateX(26px);
-}
+            .control-item {
+                width: 100%;
+                justify-content: space-between; /* Etykieta po lewej, wartość po prawej */
+                padding: 5px 0;
+                border-bottom: 1px solid #eee; /* Linia rozdzielająca dla czytelności */
+            }
 
-.switch input:disabled + .slider {
-    opacity: .6;
-    cursor: not-allowed;
-}
+            .control-item:last-child {
+                border-bottom: none;
+            }
+
+            .btn {
+                width: 100%; /* Przycisk START na całą szerokość ekranu */
+                padding: 16px; /* Wyższy przycisk (łatwiej trafić palcem) */
+                font-size: 16px;
+                margin-top: 5px;
+            }
+
+            .chart-container {
+                height: 350px; /* Nieco niższy wykres na telefonie, żeby uniknąć przewijania */
+                padding: 10px;
+            }
+
+            .tiles-grid {
+                /* Na bardzo wąskich telefonach kafelki ułożą się po 1 w rzędzie, na średnich po 2 */
+                grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); 
+                gap: 10px;
+            }
+            
+            .tile-value {
+                font-size: 24px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -319,46 +356,51 @@
         <div class="control-panel">
             <div class="control-row">
                 <div class="control-item">
-                    <span>Czas rozpoczęcia procesu: <b id="ui_startTime">--:--:--</b></span>
+                    <span>Czas rozpoczęcia procesu:</span>
+                    <b id="ui_startTime">--:--:--</b>
                 </div>
                 <div class="control-item">
-                    <span>Czas trwania: <b id="ui_duration">00:00:00</b></span>
+                    <span>Czas trwania:</span>
+                    <b id="ui_duration">00:00:00</b>
                 </div>
                 <div class="control-item">
-                    <span id="valve_range_lamp" class="status-lamp status-lamp-red"></span>
-                    <span>e-ARC <b id="valve_range_text">WYŁĄCZONY</b></span>
+                    <span>
+                        <span id="valve_range_lamp" class="status-lamp status-lamp-red"></span>
+                        e-ARC:
+                    </span>
+                    <b id="valve_range_text">WYŁĄCZONY</b>
                 </div>
-                <div class="control-item">
-                   @*  <span id="ui_valveStatus" class="valve-status">[ 230V - OFF ]</span> *@
-                    <button id="btn_processToggle" class="btn btn-start" onclick="toggleProcess()">
-                        <span id="btn_spinner" class="spinner d-none"></span>
-                        <span id="btn_text">START PROCESU</span>
-                    </button>
-                </div>
-                <div class="control-item">
+                <div class="control-item" style="border-bottom: none;">
                     <span id="heartbeat_label_text">ODBIÓR SERCA: WYŁĄCZONY</span>
                     <label class="switch" title="Odbiór serca">
                         <input id="heartbeat_switch" type="checkbox" onchange="toggleHeartbeat()" />
                         <span class="slider"></span>
                     </label>
                 </div>
-            </div>
-            <div class="control-row" style="justify-content: flex-start; gap: 20px;">
-                <div class="control-item">
-                    <label>Nazwa pliku danych:</label>
-                   @*  <input type="text" id="ui_filename"  value="MójProces.csv" style="background-color:#f9f9f9;" onchange="updateFileName(this.value)"/> *@
-                   <input type="text"
-       id="ui_filename"
-       name="FileName"
-       value="@ViewBag.CurrentFileName"
-       class="form-control"
-       onchange="updateFileName(this.value)" />
+                <div class="control-item" style="border-bottom: none; justify-content: center;">
+                    <button id="btn_processToggle" class="btn btn-start" onclick="toggleProcess()">
+                        <span id="btn_spinner" class="spinner d-none"></span>
+                        <span id="btn_text">START PROCESU</span>
+                    </button>
                 </div>
             </div>
+
+            <div class="control-row">
+                <div class="control-item-col">
+                    <label style="font-weight:bold;">Nazwa pliku danych:</label>
+                    <input type="text"
+                           id="ui_filename"
+                           name="FileName"
+                           value="@ViewBag.CurrentFileName"
+                           class="form-control"
+                           onchange="updateFileName(this.value)" />
+                </div>
+            </div>
+            
             <div class="control-row" style="margin-bottom: 0;">
-                <div class="control-item" style="width: 100%;">
-                    <label style="align-self: flex-start; padding-top: 8px;">Komentarz:</label>
-                    <input type="text" id="ui_comment" class="comment-box" placeholder="Wprowadź uwagi do logu..." oninput="updateComment(this.value)" />
+                <div class="control-item-col">
+                    <label style="font-weight:bold;">Komentarz:</label>
+                    <input type="text" id="ui_comment" placeholder="Wprowadź uwagi do logu..." oninput="updateComment(this.value)" />
                 </div>
             </div>
         </div>
@@ -427,146 +469,70 @@
             </div>
         </div>
 
-      @*   <div class="section-title">Sekcja 2: Zarządzanie energią</div>
-        <div class="tiles-grid">
-            <div class="tile">
-                <div class="tile-header">Napięcie</div>
-                <div class="tile-value" id="val_voltage">-- V</div>
-            </div>
-            <div class="tile">
-                <div class="tile-header">Prąd</div>
-                <div class="tile-value" id="val_current">-- A</div>
-            </div>
-            <div class="tile">
-                <div class="tile-header">Moc Bieżąca</div>
-                <div class="tile-value" id="val_power">-- W</div>
-            </div>
-            <div class="tile">
-                <div class="tile-header">Zużyta Moc w Sesji</div>
-                <div class="tile-value" id="val_energy">-- kWh</div>
-            </div>
-        </div> *@
-      @*   <div class="section-title">Sekcja 2: Zarządzanie energią</div>
-        
+        <div class="section-title">Sekcja 2: Zarządzanie energią</div>
+
         @{
-            var visibleTuyaDevices = new List<string>();
-            try
+            var configPath = System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "deviceconfiguration.json");
+            var visibleDevices = new List<string>();
+
+            if (System.IO.File.Exists(configPath))
             {
-                // Bezpośredni odczyt Twojego pliku bez ingerencji w IConfiguration
-                var configPath = System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "deviceconfiguration.json");
-                if (System.IO.File.Exists(configPath))
+                var json = System.IO.File.ReadAllText(configPath);
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
+
+                if (doc.RootElement.TryGetProperty("Tuya", out var tuya))
                 {
-                    var jsonText = System.IO.File.ReadAllText(configPath);
-                    using (var document = System.Text.Json.JsonDocument.Parse(jsonText))
+                    foreach (var dev in tuya.EnumerateObject())
                     {
-                        if (document.RootElement.TryGetProperty("Tuya", out var tuyaElement))
+                        if (dev.Value.TryGetProperty("VisibleOnDashboard", out var vis) && vis.GetBoolean())
                         {
-                            foreach (var device in tuyaElement.EnumerateObject())
-                            {
-                                if (device.Value.TryGetProperty("VisibleOnDashboard", out var visibleProp) && visibleProp.ValueKind == System.Text.Json.JsonValueKind.True)
-                                {
-                                    visibleTuyaDevices.Add(device.Name); // Doda m.in. "Column", "Pump"
-                                }
-                            }
+                            visibleDevices.Add(dev.Name);
                         }
                     }
                 }
             }
-            catch (Exception ex)
-            {
-                // Zabezpieczenie na wypadek problemów z plikiem JSON
-                Console.WriteLine("Błąd odczytu deviceconfiguration.json: " + ex.Message);
-            }
         }
 
-        @if(visibleTuyaDevices.Count == 0)
+        @foreach (var dev in visibleDevices)
         {
-            <div style="color: red; margin-bottom: 20px;">Brak urządzeń do wyświetlenia lub błąd odczytu z pliku deviceconfiguration.json.</div>
-        }
-
-        @foreach(var deviceName in visibleTuyaDevices)
-        {
-            <div style="margin-bottom: 5px; font-weight: bold; color: var(--fiori-blue);">Moduł: @deviceName</div>
-            <div class="tiles-grid" style="margin-bottom: 25px;">
-                <div class="tile">
-                    <div class="tile-header">Napięcie</div>
-                    <div class="tile-value" id="val_voltage_@deviceName">-- V</div>
-                </div>
-                <div class="tile">
-                    <div class="tile-header">Prąd</div>
-                    <div class="tile-value" id="val_current_@deviceName">-- A</div>
-                </div>
-                <div class="tile">
-                    <div class="tile-header">Moc Bieżąca</div>
-                    <div class="tile-value" id="val_power_@deviceName">-- W</div>
-                </div>
-                <div class="tile">
-                    <div class="tile-header">Zużyta Moc w Sesji</div>
-                    <div class="tile-value" id="val_energy_@deviceName">-- kWh</div>
-                </div>
+            <div style="margin: 15px 0 10px 0; font-weight: bold; color: var(--fiori-blue);">Urządzenie: @dev</div>
+            <div class="tiles-grid">
+                <div class="tile"><div class="tile-header">Napięcie</div><div class="tile-value" id="val_voltage_@dev">-- V</div></div>
+                <div class="tile"><div class="tile-header">Prąd</div><div class="tile-value" id="val_current_@dev">-- A</div></div>
+                <div class="tile"><div class="tile-header">Moc</div><div class="tile-value" id="val_power_@dev">-- W</div></div>
+                <div class="tile"><div class="tile-header">Sesja</div><div class="tile-value" id="val_energy_@dev">-- kWh</div></div>
             </div>
-        } *@
-        <div class="section-title">Sekcja 2: Zarządzanie energią</div>
-
-@{
-    var configPath = System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "deviceconfiguration.json");
-    var visibleDevices = new List<string>();
-
-    if (System.IO.File.Exists(configPath))
-    {
-        var json = System.IO.File.ReadAllText(configPath);
-        using var doc = System.Text.Json.JsonDocument.Parse(json);
-
-        if (doc.RootElement.TryGetProperty("Tuya", out var tuya))
-        {
-            foreach (var dev in tuya.EnumerateObject())
-            {
-                if (dev.Value.TryGetProperty("VisibleOnDashboard", out var vis) && vis.GetBoolean())
-                {
-                    visibleDevices.Add(dev.Name);
-                }
-            }
         }
-    }
-}
 
-@foreach (var dev in visibleDevices)
-{
-    <div style="margin: 15px 0 5px 0; font-weight: bold; color: var(--fiori-blue);">@dev</div>
-    <div class="tiles-grid">
-        <div class="tile"><div class="tile-header">Napięcie</div><div class="tile-value" id="val_voltage_@dev">-- V</div></div>
-        <div class="tile"><div class="tile-header">Prąd</div><div class="tile-value" id="val_current_@dev">-- A</div></div>
-        <div class="tile"><div class="tile-header">Moc</div><div class="tile-value" id="val_power_@dev">-- W</div></div>
-        <div class="tile"><div class="tile-header">Sesja</div><div class="tile-value" id="val_energy_@dev">-- kWh</div></div>
-    </div>
-}
-        @* wykres *@
         <div class="section-title">Wykres online (SignalR)</div>
         <div class="chart-container">
-            <div class="control-item" style="margin-bottom: 15px;">
-                <strong>Widoczność na wykresie:</strong>
-                <div style="display: flex; gap: 15px; flex-wrap: wrap; margin-top: 5px;">
-                    <label style="cursor: pointer;">
-                        <input type="checkbox" checked onchange="toggleSeries(0, this.checked)"> Temp. Keg (Czerwona)
+            <div style="margin-bottom: 15px;">
+                <strong style="display:block; margin-bottom:8px;">Widoczność na wykresie:</strong>
+                <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                    <label style="cursor: pointer; display:flex; align-items:center; gap:5px;">
+                        <input type="checkbox" checked onchange="toggleSeries(0, this.checked)"> Temp. Keg (Cz)
                     </label>
-                    <label style="cursor: pointer;">
-                        <input type="checkbox" checked onchange="toggleSeries(1, this.checked)"> Temp. Bufor (Niebieska)
+                    <label style="cursor: pointer; display:flex; align-items:center; gap:5px;">
+                        <input type="checkbox" checked onchange="toggleSeries(1, this.checked)"> Temp. Bufor (N)
                     </label>
-                    <label style="cursor: pointer;">
-                        <input type="checkbox" checked onchange="toggleSeries(2, this.checked)"> Temp. 10p (Pomarańczowa)
+                    <label style="cursor: pointer; display:flex; align-items:center; gap:5px;">
+                        <input type="checkbox" checked onchange="toggleSeries(2, this.checked)"> Temp. 10p (P)
                     </label>
-                    <label style="cursor: pointer;">
-                        <input type="checkbox" checked onchange="toggleSeries(3, this.checked)"> Temp. Głowica (Zielona)
+                    <label style="cursor: pointer; display:flex; align-items:center; gap:5px;">
+                        <input type="checkbox" checked onchange="toggleSeries(3, this.checked)"> Temp. Głow. (Z)
                     </label>
-                    <label style="cursor: pointer;">
-                        <input type="checkbox" checked onchange="toggleSeries(4, this.checked)"> Temp. Woda (Fioletowa)
+                    <label style="cursor: pointer; display:flex; align-items:center; gap:5px;">
+                        <input type="checkbox" checked onchange="toggleSeries(4, this.checked)"> Temp. Woda (F)
                     </label>
-                    <label style="cursor: pointer;">
-                        <input type="checkbox" checked onchange="toggleSeries(5, this.checked)"> Moc (Szara, przerywana)
+                    <label style="cursor: pointer; display:flex; align-items:center; gap:5px;">
+                        <input type="checkbox" checked onchange="toggleSeries(5, this.checked)"> Moc (Szary)
                     </label>
                 </div>
             </div>
-            <canvas id="processChart"></canvas>
+            
+            <div style="position: relative; height: calc(100% - 60px); width: 100%;">
+                <canvas id="processChart"></canvas>
+            </div>
         </div>
 
         <div class="section-title">Sekcja 3: Pogoda</div>
@@ -582,7 +548,7 @@
         </div>
     </div>
 
-  <script>
+    <script>
         let isRecording = false;
         let toggleInProgress = false;
 
@@ -644,14 +610,13 @@
                 interaction: { mode: 'index', intersect: false },
                 plugins: { legend: { display: false } },
                 scales: {
-                    x: { display: true, title: { display: true, text: 'Czas' } },
-                    yTemp: { type: 'linear', display: true, position: 'left', title: { display: true, text: 'Temperatura (°C)' } },
-                    yPower: { type: 'linear', display: true, position: 'right', title: { display: true, text: 'Moc (W)' }, grid: { drawOnChartArea: false } }
+                    x: { display: true, title: { display: false, text: 'Czas' } }, /* Zmiana: Ukryto tytuł osi X dla oszczędności miejsca na ekranie telefonu */
+                    yTemp: { type: 'linear', display: true, position: 'left', title: { display: false, text: 'Temperatura (°C)' } },
+                    yPower: { type: 'linear', display: true, position: 'right', title: { display: false, text: 'Moc (W)' }, grid: { drawOnChartArea: false } }
                 }
             }
         });
 
-        // Funkcja pomocnicza: bezpieczne pobieranie wartości niewrażliwe na wielkość liter (Case-Insensitive)
         const getSafeValue = (obj, propName) => {
             if (!obj) return null;
             const key = Object.keys(obj).find(k => k.toLowerCase() === propName.toLowerCase());
@@ -706,128 +671,108 @@
             .withAutomaticReconnect()
             .build();
 
-// DODAJ TO (brakowało)
-const activeDevices = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(visibleDevices));
+        const activeDevices = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(visibleDevices));
 
-function normalizePowerByDevice(raw) {
-    if (!raw) return {};
-
-    // Standard object map: { "Column": {...}, "Pump": {...} }
-    if (!Array.isArray(raw) && typeof raw === 'object') {
-        return raw;
-    }
-
-    // Array format: [{ key: "Column", value: {...} }] or [{ Key, Value }]
-    if (Array.isArray(raw)) {
-        const map = {};
-        raw.forEach(item => {
-            const k = item?.key ?? item?.Key;
-            const v = item?.value ?? item?.Value;
-            if (k) map[k] = v;
-        });
-        return map;
-    }
-
-    return {};
-}
-
-connection.on("ReceiveProcessData", function (data) {
-    const temperatures = data.temperatures ?? data.Temperatures ?? {};
-
-    // Replace old line:
-    // const powerByDevice = data.powerByDevice ?? data.PowerByDevice ?? {};
-    const powerByDeviceRaw = data.powerByDevice ?? data.PowerByDevice ?? {};
-    const powerByDevice = normalizePowerByDevice(powerByDeviceRaw);
-
-    // Optional debug (temporary)
-    // console.log("ReceiveProcessData powerByDevice:", powerByDevice);
-
-    // Temperatury
-    if (temperatures && Object.keys(temperatures).length > 0) {
-        const tempKeg = getSafeValue(temperatures, 'Temp_Keg');
-        const tempBufor = getSafeValue(temperatures, 'Temp_Bufor');
-        const temp10p = getSafeValue(temperatures, 'Temp_10p');
-        const tempGlowica = getSafeValue(temperatures, 'Temp_Glowica');
-        const tempWoda = getSafeValue(temperatures, 'Temp_Woda');
-
-        document.getElementById('val_temp_keg').innerText = tempKeg !== null ? tempKeg.toFixed(2) + " °C" : "-- °C";
-        document.getElementById('val_temp_bufor').innerText = tempBufor !== null ? tempBufor.toFixed(2) + " °C" : "-- °C";
-        document.getElementById('val_temp_10p').innerText = temp10p !== null ? temp10p.toFixed(2) + " °C" : "-- °C";
-        document.getElementById('val_temp_glowica').innerText = tempGlowica !== null ? tempGlowica.toFixed(2) + " °C" : "-- °C";
-        document.getElementById('val_temp_woda').innerText = tempWoda !== null ? tempWoda.toFixed(2) + " °C" : "-- °C";
-    }
-
-    // Energia - musi być wewnątrz handlera (tu jest dostęp do powerByDevice)
-    const renderedDevices = getRenderedEnergyDevices();
-
-    renderedDevices.forEach(dev => {
-        const d = findDevicePayload(powerByDevice, dev);
-
-        const voltageEl = document.getElementById('val_voltage_' + dev);
-        const currentEl = document.getElementById('val_current_' + dev);
-        const powerEl = document.getElementById('val_power_' + dev);
-        const energyEl = document.getElementById('val_energy_' + dev);
-
-        if (!d) {
-            if (voltageEl) voltageEl.innerText = "-- V";
-            if (currentEl) currentEl.innerText = "-- A";
-            if (powerEl) powerEl.innerText = "-- W";
-            if (energyEl) energyEl.innerText = "-- kWh";
-            return;
+        function normalizePowerByDevice(raw) {
+            if (!raw) return {};
+            if (!Array.isArray(raw) && typeof raw === 'object') return raw;
+            if (Array.isArray(raw)) {
+                const map = {};
+                raw.forEach(item => {
+                    const k = item?.key ?? item?.Key;
+                    const v = item?.value ?? item?.Value;
+                    if (k) map[k] = v;
+                });
+                return map;
+            }
+            return {};
         }
 
-        if (voltageEl) voltageEl.innerText = (getSafeValue(d, 'voltage') ?? 0).toFixed(1) + " V";
-        if (currentEl) currentEl.innerText = (getSafeValue(d, 'current') ?? 0).toFixed(2) + " A";
-        if (powerEl) powerEl.innerText = (getSafeValue(d, 'power') ?? 0).toFixed(0) + " W";
-        if (energyEl) energyEl.innerText = (getSafeValue(d, 'sessionEnergy') ?? 0).toFixed(3) + " kWh";
-    });
+        connection.on("ReceiveProcessData", function (data) {
+            const temperatures = data.temperatures ?? data.Temperatures ?? {};
+            const powerByDeviceRaw = data.powerByDevice ?? data.PowerByDevice ?? {};
+            const powerByDevice = normalizePowerByDevice(powerByDeviceRaw);
 
-    // Czas i stan procesu
-    document.getElementById('ui_duration').innerText = getSafeString(data, 'processDuration') ?? "00:00:00";
-    document.getElementById('ui_startTime').innerText = getSafeString(data, 'startTimeStr') ?? "--:--:--";
+            if (temperatures && Object.keys(temperatures).length > 0) {
+                const tempKeg = getSafeValue(temperatures, 'Temp_Keg');
+                const tempBufor = getSafeValue(temperatures, 'Temp_Bufor');
+                const temp10p = getSafeValue(temperatures, 'Temp_10p');
+                const tempGlowica = getSafeValue(temperatures, 'Temp_Glowica');
+                const tempWoda = getSafeValue(temperatures, 'Temp_Woda');
 
-    isRecording = !!(getSafeValue(data, 'isRecording'));
-    setToggleButtonState();
+                document.getElementById('val_temp_keg').innerText = tempKeg !== null ? tempKeg.toFixed(2) + " °C" : "-- °C";
+                document.getElementById('val_temp_bufor').innerText = tempBufor !== null ? tempBufor.toFixed(2) + " °C" : "-- °C";
+                document.getElementById('val_temp_10p').innerText = temp10p !== null ? temp10p.toFixed(2) + " °C" : "-- °C";
+                document.getElementById('val_temp_glowica').innerText = tempGlowica !== null ? tempGlowica.toFixed(2) + " °C" : "-- °C";
+                document.getElementById('val_temp_woda').innerText = tempWoda !== null ? tempWoda.toFixed(2) + " °C" : "-- °C";
+            }
 
-    // Aktualizacja Wykresu
-    const now = new Date().toLocaleTimeString();
-    processChart.data.labels.push(now);
-    processChart.data.datasets[0].data.push(getSafeValue(temperatures, 'Temp_Keg'));
-    processChart.data.datasets[1].data.push(getSafeValue(temperatures, 'Temp_Bufor'));
-    processChart.data.datasets[2].data.push(getSafeValue(temperatures, 'Temp_10p'));
-    processChart.data.datasets[3].data.push(getSafeValue(temperatures, 'Temp_Glowica'));
-    processChart.data.datasets[4].data.push(getSafeValue(temperatures, 'Temp_Woda'));
-    
-    const mainPowerObject = getSafeObject(data, 'power');
-    let mainPowerData = getSafeValue(mainPowerObject, 'power');
+            const renderedDevices = getRenderedEnergyDevices();
 
-    if (mainPowerData === null) {
-        const firstDeviceKey = Object.keys(powerByDevice)[0];
-        const firstDevice = firstDeviceKey ? powerByDevice[firstDeviceKey] : null;
-        mainPowerData = getSafeValue(firstDevice, 'power');
-    }
+            renderedDevices.forEach(dev => {
+                const d = findDevicePayload(powerByDevice, dev);
 
-    processChart.data.datasets[5].data.push(mainPowerData);
+                const voltageEl = document.getElementById('val_voltage_' + dev);
+                const currentEl = document.getElementById('val_current_' + dev);
+                const powerEl = document.getElementById('val_power_' + dev);
+                const energyEl = document.getElementById('val_energy_' + dev);
 
-    if (processChart.data.labels.length > 120) {
-        processChart.data.labels.shift();
-        processChart.data.datasets.forEach(d => d.data.shift());
-    }
-    processChart.update();
+                if (!d) {
+                    if (voltageEl) voltageEl.innerText = "-- V";
+                    if (currentEl) currentEl.innerText = "-- A";
+                    if (powerEl) powerEl.innerText = "-- W";
+                    if (energyEl) energyEl.innerText = "-- kWh";
+                    return;
+                }
 
-    // Lampka zaworu
-    const lamp = document.getElementById('valve_range_lamp');
-    const text = document.getElementById('valve_range_text');
-    const inRange = !!(getSafeValue(data, 'isValveEnabled')); 
+                if (voltageEl) voltageEl.innerText = (getSafeValue(d, 'voltage') ?? 0).toFixed(1) + " V";
+                if (currentEl) currentEl.innerText = (getSafeValue(d, 'current') ?? 0).toFixed(2) + " A";
+                if (powerEl) powerEl.innerText = (getSafeValue(d, 'power') ?? 0).toFixed(0) + " W";
+                if (energyEl) energyEl.innerText = (getSafeValue(d, 'sessionEnergy') ?? 0).toFixed(3) + " kWh";
+            });
 
-    lamp.classList.remove('status-lamp-green', 'status-lamp-red');
-    lamp.classList.add(inRange ? 'status-lamp-green' : 'status-lamp-red');
-    text.innerText = inRange ? "ZAŁĄCZONY" : "WYŁĄCZONY";
+            document.getElementById('ui_duration').innerText = getSafeString(data, 'processDuration') ?? "00:00:00";
+            document.getElementById('ui_startTime').innerText = getSafeString(data, 'startTimeStr') ?? "--:--:--";
 
-    // Heartbeat
-    heartbeatEnabled = !!(getSafeValue(data, 'isHeartbeatReceptionEnabled'));
-    setHeartbeatButtonState();
-});
+            isRecording = !!(getSafeValue(data, 'isRecording'));
+            setToggleButtonState();
+
+            const now = new Date().toLocaleTimeString();
+            processChart.data.labels.push(now);
+            processChart.data.datasets[0].data.push(getSafeValue(temperatures, 'Temp_Keg'));
+            processChart.data.datasets[1].data.push(getSafeValue(temperatures, 'Temp_Bufor'));
+            processChart.data.datasets[2].data.push(getSafeValue(temperatures, 'Temp_10p'));
+            processChart.data.datasets[3].data.push(getSafeValue(temperatures, 'Temp_Glowica'));
+            processChart.data.datasets[4].data.push(getSafeValue(temperatures, 'Temp_Woda'));
+            
+            const mainPowerObject = getSafeObject(data, 'power');
+            let mainPowerData = getSafeValue(mainPowerObject, 'power');
+
+            if (mainPowerData === null) {
+                const firstDeviceKey = Object.keys(powerByDevice)[0];
+                const firstDevice = firstDeviceKey ? powerByDevice[firstDeviceKey] : null;
+                mainPowerData = getSafeValue(firstDevice, 'power');
+            }
+
+            processChart.data.datasets[5].data.push(mainPowerData);
+
+            if (processChart.data.labels.length > 120) {
+                processChart.data.labels.shift();
+                processChart.data.datasets.forEach(d => d.data.shift());
+            }
+            processChart.update();
+
+            const lamp = document.getElementById('valve_range_lamp');
+            const text = document.getElementById('valve_range_text');
+            const inRange = !!(getSafeValue(data, 'isValveEnabled')); 
+
+            lamp.classList.remove('status-lamp-green', 'status-lamp-red');
+            lamp.classList.add(inRange ? 'status-lamp-green' : 'status-lamp-red');
+            text.innerText = inRange ? "ZAŁĄCZONY" : "WYŁĄCZONY";
+
+            heartbeatEnabled = !!(getSafeValue(data, 'isHeartbeatReceptionEnabled'));
+            setHeartbeatButtonState();
+        });
 
         async function loadCalibrations() {
             try {
@@ -877,7 +822,7 @@ connection.on("ReceiveProcessData", function (data) {
             }
 
             try { await loadWeather(); } catch (err) { console.warn(err); }
-            setInterval(loadWeather, 300000); // co 5 min
+            setInterval(loadWeather, 300000); 
         }
 
         async function sendCorrection(sensorName, offsetValue) {
@@ -908,7 +853,6 @@ connection.on("ReceiveProcessData", function (data) {
                 
                 const weather = await response.json();
                 
-                // Szuka jakiejkolwiek właściwości zawierającej słowo 'temp' i 'press'
                 const tempKey = Object.keys(weather).find(k => k.toLowerCase().includes('temp'));
                 const pressKey = Object.keys(weather).find(k => k.toLowerCase().includes('press'));
                 
@@ -923,7 +867,6 @@ connection.on("ReceiveProcessData", function (data) {
             }
         }
 
-        // Helpers
         function getRenderedEnergyDevices() {
             return Array.from(document.querySelectorAll('[id^="val_voltage_"]'))
                 .map(el => el.id.replace('val_voltage_', ''))
@@ -994,7 +937,6 @@ connection.on("ReceiveProcessData", function (data) {
                 setHeartbeatButtonState();
             } catch (err) {
                 console.error('Błąd pobierania statusu heartbeat:', err);
-                // Do not overwrite local state to false on temporary error.
                 setHeartbeatButtonState();
             }
         }
@@ -1028,7 +970,6 @@ connection.on("ReceiveProcessData", function (data) {
             }
         }
 
-        // Initialize dashboard - DODANE
         initializeDashboard();
     </script>
 </body>
