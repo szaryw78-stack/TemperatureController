@@ -13,6 +13,12 @@ namespace TemperatureController.Models
         /// </summary>
         public bool HeartbeatReceptionEnabled { get; set; } = true;
 
+        /// <summary>
+        /// Gets or sets persisted process CSV file name.
+        /// This value is stored in deviceconfiguration.json.
+        /// </summary>
+        public string ProcessFileName { get; set; } = "Log_Procesu.csv";
+
         public Calibrations Calibrations { get; set; } = new();
         public int TuyaRefreshIntervalSec { get; set; } = 5;
         public double CoolingWaterStart { get; set; }

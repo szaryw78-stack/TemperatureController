@@ -8,6 +8,8 @@
     [Route("api/process")]
     public class ProcessController : ControllerBase
     {
+        private const string DefaultProcessFileName = "Log_Procesu.csv";
+
         private readonly ProcessStateManager _state;
         private readonly IConfigFileService _configFileService;
         private readonly HardwareService _hardware;
@@ -26,6 +28,9 @@
             _state = state;
             _configFileService = configFileService;
             _hardware = hardware;
+
+            // Synchronize in-memory state with persisted config on first controller usage.
+            InitializeFileNameFromConfiguration();
         }
 
         /// <summary>
@@ -52,7 +57,18 @@
         }
 
         /// <summary>
-        /// Updates output CSV file name.
+        /// Gets currently effective output CSV file name.
+        /// </summary>
+        /// <returns>Current file name.</returns>
+        [HttpGet("filename")]
+        public IActionResult GetFileName()
+        {
+            var fileName = GetEffectiveFileName();
+            return Ok(new { name = fileName });
+        }
+
+        /// <summary>
+        /// Updates output CSV file name and persists it in deviceconfiguration.json.
         /// </summary>
         /// <param name="dto">File name payload.</param>
         /// <returns>HTTP 200 on success; 400 when invalid.</returns>
@@ -64,8 +80,19 @@
                 return BadRequest("Nazwa nie może być pusta");
             }
 
-            _state.CurrentFileName = dto.Name;
-            return Ok();
+            var normalizedName = NormalizeFileName(dto.Name);
+            if (string.IsNullOrWhiteSpace(normalizedName))
+            {
+                return BadRequest("Nieprawidłowa nazwa pliku.");
+            }
+
+            // Update runtime state.
+            _state.CurrentFileName = normalizedName;
+
+            // Persist value to configuration file.
+            PersistFileNameToConfiguration(normalizedName);
+
+            return Ok(new { name = normalizedName });
         }
 
         /// <summary>
@@ -75,8 +102,11 @@
         [HttpGet("history")]
         public IActionResult GetHistory()
         {
-            var fileName = _state.CurrentFileName;
-            if (!fileName.EndsWith(".csv")) fileName += ".csv";
+            var fileName = GetEffectiveFileName();
+            if (!fileName.EndsWith(".csv", StringComparison.OrdinalIgnoreCase))
+            {
+                fileName += ".csv";
+            }
 
             if (!System.IO.File.Exists(fileName))
             {
@@ -181,6 +211,81 @@
                 isValveEnabled,
                 temp10p
             });
+        }
+
+        /// <summary>
+        /// Initializes in-memory file name from persisted configuration.
+        /// </summary>
+        private void InitializeFileNameFromConfiguration()
+        {
+            if (!string.IsNullOrWhiteSpace(_state.CurrentFileName) &&
+                !string.Equals(_state.CurrentFileName, DefaultProcessFileName, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            try
+            {
+                var config = _configFileService.Read();
+                var persistedName = NormalizeFileName(config.ProcessConfig.ProcessFileName);
+
+                if (!string.IsNullOrWhiteSpace(persistedName))
+                {
+                    _state.CurrentFileName = persistedName;
+                }
+            }
+            catch
+            {
+                // Keep default when config cannot be read.
+            }
+        }
+
+        /// <summary>
+        /// Gets effective file name from runtime state with fallback to default.
+        /// </summary>
+        /// <returns>Effective file name.</returns>
+        private string GetEffectiveFileName()
+        {
+            if (string.IsNullOrWhiteSpace(_state.CurrentFileName))
+            {
+                return DefaultProcessFileName;
+            }
+
+            return _state.CurrentFileName;
+        }
+
+        /// <summary>
+        /// Saves file name to deviceconfiguration.json.
+        /// </summary>
+        /// <param name="fileName">Normalized file name to persist.</param>
+        private void PersistFileNameToConfiguration(string fileName)
+        {
+            var config = _configFileService.Read();
+            config.ProcessConfig.ProcessFileName = fileName;
+            _configFileService.Save(config);
+        }
+
+        /// <summary>
+        /// Normalizes user-provided file name.
+        /// </summary>
+        /// <param name="rawName">Raw file name from input.</param>
+        /// <returns>Normalized file name with .csv extension.</returns>
+        private static string NormalizeFileName(string rawName)
+        {
+            var value = (rawName ?? string.Empty).Trim();
+
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return string.Empty;
+            }
+
+            // Keep consistent format for persistence and runtime usage.
+            if (!value.EndsWith(".csv", StringComparison.OrdinalIgnoreCase))
+            {
+                value += ".csv";
+            }
+
+            return value;
         }
     }
 

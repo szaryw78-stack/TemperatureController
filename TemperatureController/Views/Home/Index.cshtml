@@ -346,7 +346,13 @@
             <div class="control-row" style="justify-content: flex-start; gap: 20px;">
                 <div class="control-item">
                     <label>Nazwa pliku danych:</label>
-                    <input type="text" id="ui_filename"  value="MójProces.csv" style="background-color:#f9f9f9;" onchange="updateFileName(this.value)"/>
+                   @*  <input type="text" id="ui_filename"  value="MójProces.csv" style="background-color:#f9f9f9;" onchange="updateFileName(this.value)"/> *@
+                   <input type="text"
+       id="ui_filename"
+       name="FileName"
+       value="@ViewBag.CurrentFileName"
+       class="form-control"
+       onchange="updateFileName(this.value)" />
                 </div>
             </div>
             <div class="control-row" style="margin-bottom: 0;">

@@ -5,6 +5,7 @@
     "ValveThresholdTempMin": 29,
     "ValveThresholdTempMax": 35,
     "HeartbeatReceptionEnabled": false,
+    "ProcessFileName": "Log_Procesu01.csv",
     "Calibrations": {
       "Temp_Keg": 0,
       "Temp_Bufor": 0,
