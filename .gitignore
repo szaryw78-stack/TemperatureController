@@ -362,3 +362,4 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 /TemperatureController/Log_Procesu01.csv
+/TemperatureController/Log_Procesu013.csv
