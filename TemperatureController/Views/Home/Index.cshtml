@@ -952,6 +952,22 @@
             }
         }
 
+        async function updateComment(commentText) {
+            try {
+                const response = await fetch('/api/process/comment', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ comment: commentText ?? "" })
+                });
+
+                if (!response.ok) {
+                    throw new Error("HTTP error");
+                }
+            } catch (err) {
+                console.error("Błąd aktualizacji komentarza:", err);
+            }
+        }
+
         async function initializeDashboard() {
             setToggleButtonState();
             setHeartbeatButtonState();
