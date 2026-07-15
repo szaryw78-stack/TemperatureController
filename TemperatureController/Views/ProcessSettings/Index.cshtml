@@ -125,10 +125,15 @@
                        value="@Model.ProcessConfig.EmergencyStop.ToString(System.Globalization.CultureInfo.InvariantCulture)" />
             </div>
             <div class="form-group">
-                <label>Status odbioru serca (HeartbeatReceptionEnabled)</label>
+                <label>Status odbioru serca</label>
                 <input type="checkbox" id="pc_HeartbeatReceptionEnabled"
                        @(Model.ProcessConfig.HeartbeatReceptionEnabled ? "checked" : "")
                        disabled />
+            </div>
+            <div class="form-group">
+                <label>Odczyt danych z Tuya</label>
+                <input type="checkbox" id="pc_TuyaReadEnabled"
+                       @(Model.ProcessConfig.TuyaReadEnabled ? "checked" : "") />
             </div>
         </div>
     </div>
@@ -225,6 +230,7 @@
                 DashboardRefreshIntervalSec: parseInt(document.getElementById('pc_DashboardRefresh').value) || 5,
                 CsvLogIntervalSec: parseInt(document.getElementById('pc_CsvLog').value) || 6,
                 TuyaRefreshIntervalSec: parseInt(document.getElementById('pc_TuyaRefresh').value) || 5,
+                TuyaReadEnabled: document.getElementById('pc_TuyaReadEnabled').checked,
                 ValveThresholdTempMin: parseFloat(document.getElementById('pc_ValveTempMin').value.replace(',', '.')) || 78.0,
                 ValveThresholdTempMax: parseFloat(document.getElementById('pc_ValveTempMax').value.replace(',', '.')) || 78.5,
                 ValveDayTemp: parseFloat(document.getElementById('pc_ValveDayTemp').value.replace(',', '.')) || 0,

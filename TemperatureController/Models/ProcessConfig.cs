@@ -6,7 +6,13 @@ namespace TemperatureController.Models
         public int CsvLogIntervalSec { get; set; } = 6;
         public double ValveThresholdTempMin { get; set; }
         public double ValveThresholdTempMax { get; set; }
-        public double ValveDayTemp{ get; set; }
+        public double ValveDayTemp { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether Tuya data polling is enabled.
+        /// When disabled, backend skips reading Tuya metrics.
+        /// </summary>
+        public bool TuyaReadEnabled { get; set; } = true;
 
         /// <summary>
         /// Gets or sets a value indicating whether heartbeat reception is enabled.

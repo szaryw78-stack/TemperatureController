@@ -5,6 +5,7 @@
     "ValveThresholdTempMin": 0.1,
     "ValveThresholdTempMax": 0.2,
     "ValveDayTemp": 58,
+    "TuyaReadEnabled": true,
     "HeartbeatReceptionEnabled": true,
     "ProcessFileName": "Log_Procesu.csv",
     "Calibrations": {

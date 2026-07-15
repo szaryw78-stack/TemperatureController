@@ -137,7 +137,8 @@
                     var powerMetrics = new Dictionary<string, PowerMetrics>(_cachedPowerMetrics, StringComparer.OrdinalIgnoreCase);
 
                     // Tuya refresh
-                    if ((DateTime.Now - _lastTuyaRefresh).TotalSeconds >= Math.Max(1, cfg.TuyaRefreshIntervalSec))
+                    if (cfg.TuyaReadEnabled &&
+    (DateTime.Now - _lastTuyaRefresh).TotalSeconds >= Math.Max(1, cfg.TuyaRefreshIntervalSec))
                     {
                         if (deviceConfig.Tuya is not null)
                         {
