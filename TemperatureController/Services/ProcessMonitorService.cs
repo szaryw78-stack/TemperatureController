@@ -26,7 +26,7 @@
         private const string CsvHeader =
             "Czas_Zapisu;Czas_Procesu;" +
             "1_Temp_Keg;2_Temp_Bufor;3_Temp_10p;4_Temp_Glowica;5_Temp_Woda;" +
-            "Napiecie_V;Prad_A;Moc_W;Zuzycie_Wh;Temp_Zewn_C;Cisnienie_hPa;Zawor;Komentarz";
+            "Napiecie_V;Prad_A;Moc_W;Zuzycie_Wh;Temp_Zewn_C;Cisnienie_hPa;Zawor;Temp_Dnia_C;Komentarz";
         private Dictionary<string, PowerMetrics> _cachedPowerMetrics = new(StringComparer.OrdinalIgnoreCase);
 
         // ADD: command edge guard (send ON once per threshold crossing)
@@ -192,8 +192,9 @@
                         WeatherTemperatureC = _cachedWeather?.TemperatureC ?? 0,
                         WeatherPressureHpa = _cachedWeather?.PressureHpa ?? 0,
                         IsValveEnabled = isValveEnabled,
-                        IsHeartbeatReceptionEnabled = isHeartbeatEnabled
-                    };
+                        IsHeartbeatReceptionEnabled = isHeartbeatEnabled,
+                        ValveDayTemp = cfg.ValveDayTemp
+};
 
                     await _hubContext.Clients.All.SendAsync("ReceiveProcessData", payload, stoppingToken);
 
@@ -335,12 +336,13 @@
                 string weatherTemp = payload.WeatherTemperatureC.ToString("F1", culture);
                 string weatherPressure = payload.WeatherPressureHpa.ToString("F1", culture);
                 string valveState = payload.IsValveEnabled ? "ON" : "OFF";
+                string valveDayTempText = payload.ValveDayTemp.ToString("F2", culture);
 
                 var line = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss};" +
                            $"{payload.ProcessDuration};" +
                            $"{tempKeg};{tempBufor};{temp10p};{tempGlowica};{tempWoda};" +
                            $"{voltage};{current};{powerActive};{energy};" +
-                           $"{weatherTemp};{weatherPressure};{valveState};" +
+                           $"{weatherTemp};{weatherPressure};{valveState};{valveDayTempText};" +
                            $"{cleanComment}\n";
 
                 // Pobranie nazwy pliku ze wspólnego stanu!
@@ -385,7 +387,7 @@
             }
 
             // Replace old header and migrate old rows:
-            // OLD: 12 columns (without weather and valve), NEW: 15 columns.
+            // OLD: 12 columns (without weather, valve and day temp), NEW: 15 columns.
             lines[0] = CsvHeader;
             for (var i = 1; i < lines.Count; i++)
             {
@@ -396,16 +398,22 @@
 
                 var parts = lines[i].Split(';');
 
-                // Legacy format: 12 columns (without weather and valve).
+                // Legacy format: 12 columns (without weather, valve and day temp).
                 if (parts.Length == 12)
                 {
-                    var migrated = parts.Take(11).Concat(new[] { "", "", "", parts[11] });
+                    var migrated = parts.Take(11).Concat(new[] { "", "", "", "", parts[11] });
                     lines[i] = string.Join(';', migrated);
                 }
-                // Legacy format: 14 columns (with weather, without valve).
+                // Legacy format: 14 columns (with weather, without valve and day temp).
                 else if (parts.Length == 14)
                 {
-                    var migrated = parts.Take(13).Concat(new[] { "", parts[13] });
+                    var migrated = parts.Take(13).Concat(new[] { "", "", parts[13] });
+                    lines[i] = string.Join(';', migrated);
+                }
+                // Legacy format: 15 columns (with weather and valve, without day temp).
+                else if (parts.Length == 15)
+                {
+                    var migrated = parts.Take(14).Concat(new[] { "", parts[14] });
                     lines[i] = string.Join(';', migrated);
                 }
             }
@@ -540,5 +548,10 @@
         /// Gets or sets a value indicating whether heartbeat reception is enabled.
         /// </summary>
         public bool IsHeartbeatReceptionEnabled { get; set; }
+
+        /// <summary>
+        /// Gets or sets configured day temperature in Celsius.
+        /// </summary>
+        public double ValveDayTemp { get; set; }
     }
 }
