@@ -840,6 +840,8 @@
 
         let heartbeatEnabled = false;
         let heartbeatToggleInProgress = false;
+        let heartbeatStatusLoadVersion = 0;
+        let heartbeatTouchedByUser = false;
 
         function setHeartbeatButtonState() {
             const sw = document.getElementById('heartbeat_switch');
@@ -857,10 +859,18 @@
         }
 
         async function loadHeartbeatStatus() {
+            const requestVersion = ++heartbeatStatusLoadVersion;
+
             try {
                 const response = await fetch('/api/process/heartbeat-status');
                 if (!response.ok) throw new Error('HTTP error');
                 const data = await response.json();
+
+                // Ignore stale response or status load after user interaction.
+                if (requestVersion !== heartbeatStatusLoadVersion || heartbeatTouchedByUser) {
+                    return;
+                }
+
                 heartbeatEnabled = !!(getSafeValue(data, 'enabled'));
                 setHeartbeatButtonState();
             } catch (err) {
@@ -874,6 +884,8 @@
 
             const sw = document.getElementById('heartbeat_switch');
             if (!sw) return;
+
+            heartbeatTouchedByUser = true; // Prevent late GET from overwriting user choice.
 
             const requestedState = !!sw.checked;
             heartbeatToggleInProgress = true;

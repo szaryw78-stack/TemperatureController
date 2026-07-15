@@ -2,10 +2,10 @@
   "ProcessConfig": {
     "DashboardRefreshIntervalSec": 5,
     "CsvLogIntervalSec": 6,
-    "ValveThresholdTempMin": 29,
-    "ValveThresholdTempMax": 35,
+    "ValveThresholdTempMin": 0.1,
+    "ValveThresholdTempMax": 0.2,
     "ValveDayTemp": 58,
-    "HeartbeatReceptionEnabled": false,
+    "HeartbeatReceptionEnabled": true,
     "ProcessFileName": "Log_Procesu.csv",
     "Calibrations": {
       "Temp_Keg": 0,
