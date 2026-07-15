@@ -105,9 +105,14 @@
                        value="@Model.ProcessConfig.ValveThresholdTempMax.ToString(System.Globalization.CultureInfo.InvariantCulture)" />
             </div>
              <div class="form-group">
-                <label>Temperatura dnia (°C)</label>
+                <label>Temperatura min (°C)</label>
                 <input type="number" step="0.02" id="pc_ValveTempMin"
                        value="@Model.ProcessConfig.ValveThresholdTempMin.ToString(System.Globalization.CultureInfo.InvariantCulture)" />
+            </div>
+                 <div class="form-group">
+                <label>Temperatura dnia (°C)</label>
+                <input type="number" step="0.02" id="pc_ValveDayTemp"
+                       value="@Model.ProcessConfig.ValveDayTemp.ToString(System.Globalization.CultureInfo.InvariantCulture)" />
             </div>
             <div class="form-group">
                 <label>Start wody (°C)</label>

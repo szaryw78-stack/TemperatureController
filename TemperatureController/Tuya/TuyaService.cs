@@ -659,6 +659,7 @@ namespace TemperatureController.Tuya
                 return (0, string.Empty);
             }
 
+          //  var energy = GetWithCode("add_ele");
             var energy = GetWithCode("add_ele", "total_energy", "cur_energy", "forward_energy_total", "total_forward_energy", "energy", "phase_a.energy", "17");
 
             return new PowerMetrics

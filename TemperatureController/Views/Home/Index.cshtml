@@ -347,6 +347,11 @@
     </style>
 </head>
 <body>
+    @{
+    var valveDayTempText = ViewBag.ValveDayTemp is not null
+        ? string.Format(System.Globalization.CultureInfo.InvariantCulture, "{0:0.00}", ViewBag.ValveDayTemp)
+        : "--";
+}
 
     <div class="app-header">
         &nbsp;&nbsp;&nbsp; Raspberry Pi 5 - Proces Rektyfikacji
@@ -385,24 +390,33 @@
                 </div>
             </div>
 
-            <div class="control-row">
-                <div class="control-item-col">
-                    <label style="font-weight:bold;">Nazwa pliku danych:</label>
-                    <input type="text"
-                           id="ui_filename"
-                           name="FileName"
-                           value="@ViewBag.CurrentFileName"
-                           class="form-control"
-                           onchange="updateFileName(this.value)" />
-                </div>
+            <div class="control-row" style="margin-top: 6px;">
+        <div class="control-item-col" style="max-width: 320px;">
+            <div class="tile" style="width: 100%; margin-bottom: 0;">
+                <div class="tile-header">Temperatura dnia (z ustawień)</div>
+                <div class="tile-value" id="val_day_temp">@valveDayTempText °C</div>
             </div>
-            
-            <div class="control-row" style="margin-bottom: 0;">
-                <div class="control-item-col">
-                    <label style="font-weight:bold;">Komentarz:</label>
-                    <input type="text" id="ui_comment" placeholder="Wprowadź uwagi do logu..." oninput="updateComment(this.value)" />
-                </div>
-            </div>
+        </div>
+    </div>
+
+    <div class="control-row">
+        <div class="control-item-col">
+            <label style="font-weight:bold;">Nazwa pliku danych:</label>
+            <input type="text"
+                   id="ui_filename"
+                   name="FileName"
+                   value="@ViewBag.CurrentFileName"
+                   class="form-control"
+                   onchange="updateFileName(this.value)" />
+        </div>
+    </div>
+    
+    <div class="control-row" style="margin-bottom: 0;">
+        <div class="control-item-col">
+            <label style="font-weight:bold;">Komentarz:</label>
+            <input type="text" id="ui_comment" placeholder="Wprowadź uwagi do logu..." oninput="updateComment(this.value)" />
+        </div>
+    </div>
         </div>
 
         <div class="section-title">Sekcja 1: Parametry procesu</div>
@@ -546,7 +560,15 @@
                 <div class="tile-value" id="val_weather_pressure">-- hPa</div>
             </div>
         </div>
-    </div>
+  @*   </div><div class="control-row" style="margin-top: 6px;">
+            <div class="control-item-col" style="max-width: 320px;">
+                <div class="tile" style="width: 100%; margin-bottom: 0;">
+                    <div class="tile-header">Temperatura dnia (z ustawień)</div>
+                    <div class="tile-value" id="val_day_temp">@valveDayTempText °C</div>
+                </div>
+            </div>
+        </div>
+    </div> *@
 
     <script>
         let isRecording = false;
@@ -989,7 +1011,7 @@
                 console.error("Nie udało się uruchomić połączenia SignalR:", err);
             }
 
-            try { await loadWeather(); } catch (err) { console.warn(err); }
+            try { await loadWeather(); } catch { }
             setInterval(loadWeather, 300000);
         }
 

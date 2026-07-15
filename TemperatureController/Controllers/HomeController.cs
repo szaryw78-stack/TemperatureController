@@ -39,10 +39,14 @@ namespace TemperatureController.Controllers
                 {
                     _stateManager.CurrentFileName = persisted;
                 }
+
+                // Expose day temperature from settings on the main dashboard.
+                ViewBag.ValveDayTemp = config.ProcessConfig.ValveDayTemp;
             }
             catch
             {
                 // Keep in-memory value when config is unavailable.
+                ViewBag.ValveDayTemp = null;
             }
 
             ViewBag.CurrentFileName = _stateManager.CurrentFileName;
