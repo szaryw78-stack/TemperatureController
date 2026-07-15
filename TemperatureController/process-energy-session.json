@@ -1,0 +1,11 @@
+{
+  "SessionEnergyByDeviceKwh": {
+    "Column": 0,
+    "Pump": 0
+  },
+  "LastPowerByDeviceW": {
+    "Column": 0,
+    "Pump": 0
+  },
+  "LastEnergySampleUtc": "2026-07-15T07:26:54.0179766Z"
+}

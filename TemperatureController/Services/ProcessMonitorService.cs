@@ -32,6 +32,13 @@
         // ADD: command edge guard (send ON once per threshold crossing)
         private bool _pumpOnCommandSent;
 
+        private readonly string _sessionEnergyStateFilePath;
+        private readonly JsonSerializerOptions _stateJsonOptions = new() { WriteIndented = true };
+        private Dictionary<string, double> _sessionEnergyByDeviceKwh = new(StringComparer.OrdinalIgnoreCase);
+        private Dictionary<string, double> _lastPowerByDeviceW = new(StringComparer.OrdinalIgnoreCase);
+        private DateTime? _lastEnergySampleUtc;
+        private bool _previousRecordingState;
+
         /// <summary>
         /// Initializes a new instance of the <see cref="ProcessMonitorService"/> class.
         /// </summary>
@@ -55,6 +62,10 @@
             _hubContext = hub;
             _state = state;
             _configFilePath = Path.Combine(environment.ContentRootPath, "deviceconfiguration.json");
+
+            _sessionEnergyStateFilePath = Path.Combine(environment.ContentRootPath, "process-energy-session.json");
+            LoadSessionEnergyState();
+            _previousRecordingState = _state.IsRecording;
         }
 
         /// <summary>
@@ -168,12 +179,17 @@
                         }
                     }
 
+                    // Recording state transition handling + backend session integration
+                    HandleRecordingTransition();
+                    UpdateSessionEnergy(powerMetrics);
+                    ApplySessionEnergyToPowerMetrics(powerMetrics);
+
                     var mainPower =
                         powerMetrics.TryGetValue("Column", out var columnPower) ? columnPower :
                         powerMetrics.Values.FirstOrDefault() ??
                         new PowerMetrics();
 
-                    // 1) W ExecuteAsync - przed budową payload
+                    // Przywrócone: wyliczenie czasu startu procesu przed budową payload.
                     var processStartTime = ResolveProcessStartTime(_state.CurrentFileName) ?? _state.ProcessStartTime;
 
                     var payload = new ProcessLogPayload
@@ -211,6 +227,11 @@
                         SaveToCsv(payload);
                         _lastCsvLog = DateTime.Now;
                     }
+
+                    // Przywrócone: tak jak wcześniej, po wysyłce payload/csv.
+                    HandleRecordingTransition();
+                    UpdateSessionEnergy(powerMetrics);
+                    ApplySessionEnergyToPowerMetrics(powerMetrics);
 
                     // Dashboard refresh delay
                     await Task.Delay(TimeSpan.FromSeconds(Math.Max(1, cfg.DashboardRefreshIntervalSec)), stoppingToken);
@@ -476,6 +497,153 @@
 
             return null;
         }
+
+        /// <summary>
+        /// Handles transitions between stopped and recording process states.
+        /// </summary>
+        private void HandleRecordingTransition()
+        {
+            if (!_previousRecordingState && _state.IsRecording)
+            {
+                // New recording session starts -> reset backend energy accumulator.
+                _sessionEnergyByDeviceKwh = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+                _lastPowerByDeviceW = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+                _lastEnergySampleUtc = null;
+                SaveSessionEnergyState();
+            }
+            else if (_previousRecordingState && !_state.IsRecording)
+            {
+                // Recording stopped -> keep accumulated value visible, stop integration clock.
+                _lastEnergySampleUtc = null;
+                _lastPowerByDeviceW = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+                SaveSessionEnergyState();
+            }
+
+            _previousRecordingState = _state.IsRecording;
+        }
+
+        /// <summary>
+        /// Updates backend session energy accumulator based on current power values.
+        /// </summary>
+        /// <param name="powerByDevice">Current power metrics by device.</param>
+        private void UpdateSessionEnergy(Dictionary<string, PowerMetrics> powerByDevice)
+        {
+            if (!_state.IsRecording || powerByDevice is null || powerByDevice.Count == 0)
+            {
+                return;
+            }
+
+            var nowUtc = DateTime.UtcNow;
+            var currentPowerByDevice = powerByDevice.ToDictionary(
+                x => x.Key,
+                x => Math.Max(0, x.Value?.Power ?? 0),
+                StringComparer.OrdinalIgnoreCase);
+
+            if (_lastEnergySampleUtc is null)
+            {
+                _lastEnergySampleUtc = nowUtc;
+                _lastPowerByDeviceW = currentPowerByDevice;
+                SaveSessionEnergyState();
+                return;
+            }
+
+            var deltaHours = (nowUtc - _lastEnergySampleUtc.Value).TotalHours;
+            if (deltaHours <= 0)
+            {
+                return;
+            }
+
+            var deviceNames = _lastPowerByDeviceW.Keys
+                .Union(currentPowerByDevice.Keys, StringComparer.OrdinalIgnoreCase);
+
+            foreach (var deviceName in deviceNames)
+            {
+                var prevW = _lastPowerByDeviceW.TryGetValue(deviceName, out var p) ? p : 0.0;
+                var currW = currentPowerByDevice.TryGetValue(deviceName, out var c) ? c : 0.0;
+
+                // Trapezoidal integration [W] * [h] => [Wh], then /1000 => [kWh].
+                var avgW = (prevW + currW) / 2.0;
+                var deltaKwh = (avgW * deltaHours) / 1000.0;
+
+                if (!_sessionEnergyByDeviceKwh.ContainsKey(deviceName))
+                {
+                    _sessionEnergyByDeviceKwh[deviceName] = 0.0;
+                }
+
+                _sessionEnergyByDeviceKwh[deviceName] += Math.Max(0, deltaKwh);
+            }
+
+            _lastPowerByDeviceW = currentPowerByDevice;
+            _lastEnergySampleUtc = nowUtc;
+
+            SaveSessionEnergyState();
+        }
+
+        /// <summary>
+        /// Overrides Tuya session energy with backend-calculated session energy.
+        /// </summary>
+        /// <param name="powerByDevice">Power metrics map sent to dashboard.</param>
+        private void ApplySessionEnergyToPowerMetrics(Dictionary<string, PowerMetrics> powerByDevice)
+        {
+            foreach (var device in powerByDevice)
+            {
+                device.Value.SessionEnergy = _sessionEnergyByDeviceKwh.TryGetValue(device.Key, out var kwh)
+                    ? kwh
+                    : 0.0;
+            }
+        }
+
+        /// <summary>
+        /// Loads persisted session energy state from disk.
+        /// </summary>
+        private void LoadSessionEnergyState()
+        {
+            try
+            {
+                if (!File.Exists(_sessionEnergyStateFilePath))
+                {
+                    return;
+                }
+
+                var json = File.ReadAllText(_sessionEnergyStateFilePath);
+                var state = JsonSerializer.Deserialize<SessionEnergyStateDto>(json);
+                if (state is null)
+                {
+                    return;
+                }
+
+                _sessionEnergyByDeviceKwh = state.SessionEnergyByDeviceKwh ?? new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+                _lastPowerByDeviceW = state.LastPowerByDeviceW ?? new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+                _lastEnergySampleUtc = state.LastEnergySampleUtc;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Session energy state load error: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Saves current session energy state to disk.
+        /// </summary>
+        private void SaveSessionEnergyState()
+        {
+            try
+            {
+                var dto = new SessionEnergyStateDto
+                {
+                    SessionEnergyByDeviceKwh = _sessionEnergyByDeviceKwh,
+                    LastPowerByDeviceW = _lastPowerByDeviceW,
+                    LastEnergySampleUtc = _lastEnergySampleUtc
+                };
+
+                var json = JsonSerializer.Serialize(dto, _stateJsonOptions);
+                File.WriteAllText(_sessionEnergyStateFilePath, json);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Session energy state save error: {ex.Message}");
+            }
+        }
     }
 
     /// <summary>
@@ -551,5 +719,26 @@
         /// Gets or sets configured day temperature in Celsius.
         /// </summary>
         public double ValveDayTemp { get; set; }
+    }
+
+    /// <summary>
+    /// Stores persisted backend session energy integration state.
+    /// </summary>
+    public class SessionEnergyStateDto
+    {
+        /// <summary>
+        /// Gets or sets accumulated session energy in kWh by device.
+        /// </summary>
+        public Dictionary<string, double> SessionEnergyByDeviceKwh { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// Gets or sets previous power sample in watts by device.
+        /// </summary>
+        public Dictionary<string, double> LastPowerByDeviceW { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// Gets or sets timestamp of the last integration sample.
+        /// </summary>
+        public DateTime? LastEnergySampleUtc { get; set; }
     }
 }
