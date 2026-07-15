@@ -414,7 +414,16 @@
     <div class="control-row" style="margin-bottom: 0;">
         <div class="control-item-col">
             <label style="font-weight:bold;">Komentarz:</label>
-            <input type="text" id="ui_comment" placeholder="Wprowadź uwagi do logu..." oninput="updateComment(this.value)" />
+            <input type="text" id="ui_comment" placeholder="Wprowadź uwagi do logu..." />
+
+            <button type="button" class="btn btn-start" style="max-width: 260px;" onclick="saveCommentToLog()">
+                ZAPISZ KOMENTARZ DO LOGU
+            </button>
+
+            <label style="font-weight:bold; margin-top:6px;">
+                Ostatni zapisany komentarz:
+                <span id="ui_last_comment" style="font-weight:normal;">--</span>
+            </label>
         </div>
     </div>
         </div>
@@ -990,6 +999,61 @@
             }
         }
 
+        /// <summary>
+        /// Saves one-shot comment row to CSV with current process parameters.
+        /// </summary>
+        async function saveCommentToLog() {
+            const input = document.getElementById('ui_comment');
+            const lastComment = document.getElementById('ui_last_comment');
+
+            const comment = (input?.value ?? '').trim();
+            if (!comment) {
+                alert('Wpisz komentarz.');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/process/comment-log', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ comment: comment })
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(errorText || 'HTTP error');
+                }
+
+                const data = await response.json();
+                const savedComment = data?.comment ?? comment;
+
+                if (lastComment) {
+                    lastComment.innerText = savedComment;
+                }
+
+                // Clear input after successful save.
+                if (input) {
+                    input.value = '';
+                }
+            } catch (err) {
+                console.error('Błąd zapisu komentarza do logu:', err);
+                alert('Nie udało się zapisać komentarza do logu.');
+            }
+        }
+
+        async function loadLastComment() {
+            try {
+                const response = await fetch('/api/process/last-comment');
+                if (!response.ok) throw new Error('HTTP error');
+                const data = await response.json();
+                const lastComment = getSafeString(data, 'lastComment') ?? "--";
+                document.getElementById('ui_last_comment').innerText = lastComment;
+            } catch (err) {
+                console.error('Błąd pobierania ostatniego komentarza:', err);
+                document.getElementById('ui_last_comment').innerText = "--";
+            }
+        }
+
         async function initializeDashboard() {
             setToggleButtonState();
             setHeartbeatButtonState();
@@ -1013,6 +1077,9 @@
 
             try { await loadWeather(); } catch { }
             setInterval(loadWeather, 300000);
+
+            // Załaduj ostatni komentarz na starcie
+            loadLastComment();
         }
 
         initializeDashboard();

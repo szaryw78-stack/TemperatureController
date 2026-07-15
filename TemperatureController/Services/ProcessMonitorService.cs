@@ -198,8 +198,15 @@
 
                     await _hubContext.Clients.All.SendAsync("ReceiveProcessData", payload, stoppingToken);
 
-                    // CSV log refresh
-                    if (_state.IsRecording && (DateTime.Now - _lastCsvLog).TotalSeconds >= Math.Max(1, cfg.CsvLogIntervalSec))
+                    var oneShotComment = _state.DequeueOneShotCommentLog();
+
+                    if (!string.IsNullOrWhiteSpace(oneShotComment))
+                    {
+                        // Save one immediate row with full current payload + one-shot comment.
+                        SaveToCsv(payload, oneShotComment);
+                        _lastCsvLog = DateTime.Now;
+                    }
+                    else if (_state.IsRecording && (DateTime.Now - _lastCsvLog).TotalSeconds >= Math.Max(1, cfg.CsvLogIntervalSec))
                     {
                         SaveToCsv(payload);
                         _lastCsvLog = DateTime.Now;
@@ -292,17 +299,13 @@
         /// Appends a single process row to CSV file, ensuring header compatibility.
         /// </summary>
         /// <param name="payload">Current process snapshot to persist.</param>
-        private void SaveToCsv(ProcessLogPayload payload)
+        /// <param name="commentOverride">Optional one-shot comment used only for this row.</param>
+        private void SaveToCsv(ProcessLogPayload payload, string? commentOverride = null)
         {
             try
             {
-
-                // 5. Przygotowanie danych
                 if (_state.IsRecording)
                 {
-                    //// Jeśli plik istnieje, czas procesu to różnica między teraz a datą stworzenia pliku
-                    //TimeSpan duration = DateTime.Now - _state.ProcessStartTime;
-                    //payload.ProcessDuration = duration.ToString(@"hh\:mm\:ss");
                     var processStartTime = ResolveProcessStartTime(_state.CurrentFileName) ?? _state.ProcessStartTime;
                     var duration = DateTime.Now - processStartTime;
                     payload.ProcessDuration = duration.ToString(@"hh\:mm\:ss");
@@ -314,25 +317,22 @@
 
                 var culture = System.Globalization.CultureInfo.GetCultureInfo("pl-PL");
 
-                // Formatowanie temperatur
                 string tempKeg = payload.Temperatures.GetValueOrDefault("Temp_Keg", 0).ToString("F1", culture);
                 string tempBufor = payload.Temperatures.GetValueOrDefault("Temp_Bufor", 0).ToString("F1", culture);
                 string temp10p = payload.Temperatures.GetValueOrDefault("Temp_10p", 0).ToString("F1", culture);
                 string tempGlowica = payload.Temperatures.GetValueOrDefault("Temp_Glowica", 0).ToString("F1", culture);
                 string tempWoda = payload.Temperatures.GetValueOrDefault("Temp_Woda", 0).ToString("F1", culture);
 
-                // Formatowanie energii
                 var power = payload.Power ?? new PowerMetrics();
-
                 string voltage = power.Voltage.ToString("F1", culture);
                 string current = power.Current.ToString("F2", culture);
                 string powerActive = power.Power.ToString("F1", culture);
                 string energy = power.SessionEnergy.ToString("F2", culture);
 
-                // Pobranie aktualnego komentarza ze wspólnego stanu!
-                string cleanComment = _state.CurrentComment?.Replace("\r", "").Replace("\n", " ").Replace(";", ",") ?? "";
+                // Use one-shot comment when provided; otherwise keep existing behavior.
+                var rawComment = commentOverride ?? _state.CurrentComment;
+                string cleanComment = rawComment?.Replace("\r", "").Replace("\n", " ").Replace(";", ",") ?? "";
 
-                // 5) W SaveToCsv dopisz kolumny
                 string weatherTemp = payload.WeatherTemperatureC.ToString("F1", culture);
                 string weatherPressure = payload.WeatherPressureHpa.ToString("F1", culture);
                 string valveState = payload.IsValveEnabled ? "ON" : "OFF";
@@ -345,12 +345,10 @@
                            $"{weatherTemp};{weatherPressure};{valveState};{valveDayTempText};" +
                            $"{cleanComment}\n";
 
-                // Pobranie nazwy pliku ze wspólnego stanu!
                 string fileName = _state.CurrentFileName;
                 if (!fileName.EndsWith(".csv")) fileName += ".csv";
 
                 EnsureCsvHeader(fileName);
-
                 File.AppendAllText(fileName, line);
             }
             catch (Exception ex)

@@ -4,6 +4,8 @@
     {
         private readonly object _sync = new();
 
+        private string? _pendingCommentForOneShotLog;
+
         public bool IsRecording { get; private set; } = false;
         public DateTime ProcessStartTime { get; set; }
         public string CurrentComment { get; set; } = "";
@@ -51,6 +53,32 @@
                 }
 
                 return IsRecording;
+            }
+        }
+
+        /// <summary>
+        /// Queues a one-shot CSV log request with a dedicated comment value.
+        /// </summary>
+        /// <param name="comment">Comment text to save in a single log row.</param>
+        public void QueueOneShotCommentLog(string comment)
+        {
+            lock (_sync)
+            {
+                _pendingCommentForOneShotLog = comment ?? string.Empty;
+            }
+        }
+
+        /// <summary>
+        /// Dequeues pending one-shot CSV comment log request.
+        /// </summary>
+        /// <returns>Queued comment when available; otherwise <see langword="null"/>.</returns>
+        public string? DequeueOneShotCommentLog()
+        {
+            lock (_sync)
+            {
+                var value = _pendingCommentForOneShotLog;
+                _pendingCommentForOneShotLog = null;
+                return value;
             }
         }
     }

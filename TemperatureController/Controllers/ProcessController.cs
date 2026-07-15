@@ -287,6 +287,29 @@
 
             return value;
         }
+
+        /// <summary>
+        /// Queues one-shot comment log row save to CSV with current process parameters.
+        /// </summary>
+        /// <param name="dto">Comment payload.</param>
+        /// <returns>HTTP 200 when queued; 400 when invalid.</returns>
+        [HttpPost("comment-log")]
+        public IActionResult SaveCommentToLog([FromBody] CommentDto dto)
+        {
+            if (!_state.IsRecording)
+            {
+                return BadRequest("Proces nie jest uruchomiony.");
+            }
+
+            var comment = (dto?.Comment ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(comment))
+            {
+                return BadRequest("Komentarz nie może być pusty.");
+            }
+
+            _state.QueueOneShotCommentLog(comment);
+            return Ok(new { success = true, comment });
+        }
     }
 
     public class CommentDto
