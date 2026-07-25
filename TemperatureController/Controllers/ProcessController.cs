@@ -1,6 +1,7 @@
 ﻿namespace TemperatureController.Controllers
 {
     using Microsoft.AspNetCore.Mvc;
+    using System.Globalization;
     using TemperatureController.Models;
     using TemperatureController.Services;
 
@@ -98,9 +99,11 @@
         /// <summary>
         /// Returns chart history from CSV file.
         /// </summary>
+        /// <param name="from">Optional lower date-time boundary for chart history (inclusive).</param>
+        /// <param name="to">Optional upper date-time boundary for chart history (inclusive).</param>
         /// <returns>List of chart points.</returns>
         [HttpGet("history")]
-        public IActionResult GetHistory()
+        public IActionResult GetHistory([FromQuery] string? from = null, [FromQuery] string? to = null)
         {
             var fileName = GetEffectiveFileName();
             if (!fileName.EndsWith(".csv", StringComparison.OrdinalIgnoreCase))
@@ -115,6 +118,16 @@
 
             var history = new List<object>();
             var culture = new System.Globalization.CultureInfo("pl-PL");
+            var fromDate = ParseFilterDateTime(from);
+            var toDate = ParseFilterDateTime(to);
+
+            // Support accidental reversed ranges from UI.
+            if (fromDate.HasValue && toDate.HasValue && fromDate.Value > toDate.Value)
+            {
+                (fromDate, toDate) = (toDate, fromDate);
+            }
+
+            var hasDateFilter = fromDate.HasValue || toDate.HasValue;
 
             try
             {
@@ -130,6 +143,25 @@
                     var parts = line.Split(';');
                     if (parts.Length >= 10)
                     {
+                        var rowTimestamp = ParseCsvDateTime(parts[0]);
+                        if (hasDateFilter)
+                        {
+                            if (!rowTimestamp.HasValue)
+                            {
+                                continue;
+                            }
+
+                            if (fromDate.HasValue && rowTimestamp.Value < fromDate.Value)
+                            {
+                                continue;
+                            }
+
+                            if (toDate.HasValue && rowTimestamp.Value > toDate.Value)
+                            {
+                                continue;
+                            }
+                        }
+
                         history.Add(new
                         {
                             time = parts[0],
@@ -149,6 +181,71 @@
             }
 
             return Ok(history);
+        }
+
+        /// <summary>
+        /// Parses date-time filter passed from chart history UI.
+        /// </summary>
+        /// <param name="rawValue">Raw query value from request.</param>
+        /// <returns>Parsed local date-time or <see langword="null"/> when value is missing/invalid.</returns>
+        private static DateTime? ParseFilterDateTime(string? rawValue)
+        {
+            if (string.IsNullOrWhiteSpace(rawValue))
+            {
+                return null;
+            }
+
+            var value = rawValue.Trim();
+            var formats = new[]
+            {
+                "yyyy-MM-ddTHH:mm",
+                "yyyy-MM-ddTHH:mm:ss",
+                "yyyy-MM-dd HH:mm:ss"
+            };
+
+            if (DateTime.TryParseExact(
+                value,
+                formats,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeLocal,
+                out var parsedExact))
+            {
+                return parsedExact;
+            }
+
+            if (DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out var parsed))
+            {
+                return parsed;
+            }
+
+            return DateTime.TryParse(value, new CultureInfo("pl-PL"), DateTimeStyles.AssumeLocal, out parsed)
+                ? parsed
+                : null;
+        }
+
+        /// <summary>
+        /// Parses timestamp from the first CSV column.
+        /// </summary>
+        /// <param name="rawTimestamp">Raw timestamp value from CSV row.</param>
+        /// <returns>Parsed local date-time or <see langword="null"/> when parsing fails.</returns>
+        private static DateTime? ParseCsvDateTime(string? rawTimestamp)
+        {
+            if (string.IsNullOrWhiteSpace(rawTimestamp))
+            {
+                return null;
+            }
+
+            if (DateTime.TryParseExact(
+                rawTimestamp,
+                "yyyy-MM-dd HH:mm:ss",
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeLocal,
+                out var parsedExact))
+            {
+                return parsedExact;
+            }
+
+            return DateTime.TryParse(rawTimestamp, out var parsed) ? parsed : null;
         }
 
         /// <summary>

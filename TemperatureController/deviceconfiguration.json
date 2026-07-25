@@ -6,7 +6,7 @@
     "ValveThresholdTempMax": 0.2,
     "ValveDayTemp": 58,
     "TuyaReadEnabled": true,
-    "HeartbeatReceptionEnabled": true,
+    "HeartbeatReceptionEnabled": false,
     "ProcessFileName": "Log_Procesu.csv",
     "Calibrations": {
       "Temp_Keg": 0,
@@ -15,7 +15,7 @@
       "Temp_Glowica": 0.1,
       "Temp_Woda": 0.25
     },
-    "TuyaRefreshIntervalSec": 5,
+    "TuyaRefreshIntervalSec": 120,
     "CoolingWaterStart": 20,
     "EmergencyStop": 80
   },

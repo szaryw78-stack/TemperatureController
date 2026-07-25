@@ -292,6 +292,29 @@
             cursor: not-allowed;
         }
 
+        .chart-filter-row {
+            display: flex;
+            gap: 12px;
+            align-items: end;
+            flex-wrap: wrap;
+            margin-top: 10px;
+            margin-bottom: 12px;
+        }
+
+        .chart-filter-item {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            min-width: 220px;
+        }
+
+        .chart-filter-item input[type="datetime-local"] {
+            padding: 8px;
+            border: 1px solid var(--fiori-border);
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
         /* ========================================= */
         /* OPTYMALIZACJA DLA TELEFONÓW KOMÓRKOWYCH   */
         /* ========================================= */
@@ -551,6 +574,20 @@
                         <input type="checkbox" checked onchange="toggleSeries(5, this.checked)"> Moc (Szary)
                     </label>
                 </div>
+
+                <div class="chart-filter-row">
+                    <div class="chart-filter-item">
+                        <label for="chart_from" style="font-weight: bold;">Data i czas od:</label>
+                        <input type="datetime-local" id="chart_from" />
+                    </div>
+                    <div class="chart-filter-item">
+                        <label for="chart_to" style="font-weight: bold;">Data i czas do:</label>
+                        <input type="datetime-local" id="chart_to" />
+                    </div>
+                    <button type="button" class="btn btn-start" style="max-width: 220px;" onclick="applyChartDateRange()">
+                        ZAŁADUJ ZAKRES
+                    </button>
+                </div>
             </div>
             
             <div style="position: relative; height: calc(100% - 60px); width: 100%;">
@@ -668,8 +705,74 @@
             return (val && typeof val === 'object') ? val : null;
         };
 
-        function loadChartHistory() {
-            fetch('/api/process/history')
+        const chartRangeStorageKey = 'processChartDateRange';
+
+        function buildHistoryUrl(fromDateTime, toDateTime) {
+            const params = new URLSearchParams();
+
+            if (fromDateTime && fromDateTime.trim()) {
+                params.append('from', fromDateTime.trim());
+            }
+
+            if (toDateTime && toDateTime.trim()) {
+                params.append('to', toDateTime.trim());
+            }
+
+            const query = params.toString();
+            return query ? `/api/process/history?${query}` : '/api/process/history';
+        }
+
+        function getChartRangeFromInputs() {
+            const fromInput = document.getElementById('chart_from');
+            const toInput = document.getElementById('chart_to');
+
+            return {
+                from: (fromInput?.value ?? '').trim(),
+                to: (toInput?.value ?? '').trim()
+            };
+        }
+
+        function saveChartRangeToStorage() {
+            const range = getChartRangeFromInputs();
+            localStorage.setItem(chartRangeStorageKey, JSON.stringify(range));
+        }
+
+        function restoreChartRangeFromStorage() {
+            const raw = localStorage.getItem(chartRangeStorageKey);
+            if (!raw) {
+                return;
+            }
+
+            try {
+                const range = JSON.parse(raw);
+                const fromInput = document.getElementById('chart_from');
+                const toInput = document.getElementById('chart_to');
+
+                if (fromInput && typeof range?.from === 'string') {
+                    fromInput.value = range.from;
+                }
+
+                if (toInput && typeof range?.to === 'string') {
+                    toInput.value = range.to;
+                }
+            } catch {
+                localStorage.removeItem(chartRangeStorageKey);
+            }
+        }
+
+        function loadChartHistory(fromDateTime = undefined, toDateTime = undefined) {
+            let fromValue = fromDateTime;
+            let toValue = toDateTime;
+
+            if (fromValue === undefined && toValue === undefined) {
+                const range = getChartRangeFromInputs();
+                fromValue = range.from;
+                toValue = range.to;
+            }
+
+            const historyUrl = buildHistoryUrl(fromValue, toValue);
+
+            fetch(historyUrl)
                 .then(response => response.json())
                 .then(data => {
                     processChart.data.labels = [];
@@ -688,6 +791,17 @@
                     processChart.update();
                 })
                 .catch(err => console.error("Błąd pobierania historii wykresu:", err));
+        }
+
+        function applyChartDateRange() {
+            const fromInput = document.getElementById('chart_from');
+            const toInput = document.getElementById('chart_to');
+
+            const fromValue = fromInput?.value ?? '';
+            const toValue = toInput?.value ?? '';
+
+            saveChartRangeToStorage();
+            loadChartHistory(fromValue, toValue);
         }
 
         function toggleSeries(datasetIndex, isVisible) {
@@ -1069,6 +1183,8 @@
         async function initializeDashboard() {
             setToggleButtonState();
             setHeartbeatButtonState();
+
+            restoreChartRangeFromStorage();
 
             // WAŻNE: nie zapisuj nazwy pliku przy starcie strony
             // (to nadpisywało config po wejściu z innego urządzenia).
