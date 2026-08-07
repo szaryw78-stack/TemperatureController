@@ -48,15 +48,10 @@ namespace TemperatureController.Services
         /// <param name="outputHtmlPath">Ścieżka docelowa pliku HTML.</param>
         public static void GenerujHtml(List<PomiarProcesu> pomiary, string outputHtmlPath)
         {
-            if (pomiary is null || pomiary.Count == 0)
-            {
+            if (pomiary == null || pomiary.Count == 0)
                 throw new ArgumentException("Lista pomiarów nie może być pusta.", nameof(pomiary));
-            }
 
-            // Keep only last 10 records for online/mobile report.
-            var ostatniePomiary = pomiary.TakeLast(10).ToList();
-            var ostatni = ostatniePomiary.Last();
-
+            var ostatni = pomiary.Last();
             var sb = new StringBuilder();
 
             sb.AppendLine("<!DOCTYPE html>");
@@ -101,25 +96,37 @@ namespace TemperatureController.Services
             sb.AppendLine("</head>");
             sb.AppendLine("<body>");
 
+            // NAGŁÓWEK
             sb.AppendLine("    <div class=\"header\">");
             sb.AppendLine("        <h1>⚙️ Monitor Procesu Online</h1>");
-            sb.AppendLine($"        <p>Ostatnia aktualizacja: {ostatni.CzasZapisu} | Liczba rekordów: {ostatniePomiary.Count}</p>");
+            sb.AppendLine($"        <p>Ostatnia aktualizacja: {ostatni.CzasZapisu} | Liczba rekordów: {pomiary.Count}</p>");
             sb.AppendLine("    </div>");
 
+            // DASHBOARD: 2 RZĘDY KAFELKÓW
             sb.AppendLine("    <div class=\"summary-container\">");
+
+            // Rząd 1: Keg, Bufor, Głowica
             sb.AppendLine("        <div class=\"summary-grid\">");
             sb.AppendLine($"            <div class=\"summary-cell\"><div class=\"summary-lbl\">Temp. Keg</div><div class=\"summary-val\">{ostatni.TempKeg} °C</div></div>");
             sb.AppendLine($"            <div class=\"summary-cell\"><div class=\"summary-lbl\">Temp. Bufor</div><div class=\"summary-val\">{ostatni.TempBufor} °C</div></div>");
+            sb.AppendLine($"            <div class=\"summary-cell\"><div class=\"summary-lbl\">Temp. Głowica</div><div class=\"summary-val\" style=\"color: #f43f5e;\">{ostatni.TempGlowica} °C</div></div>");
+            sb.AppendLine("        </div>");
+
+            // Rząd 2: 10p, Woda chłodząca, Temp. Dnia
+            sb.AppendLine("        <div class=\"summary-grid\">");
             sb.AppendLine($"            <div class=\"summary-cell\"><div class=\"summary-lbl\">Temp. 10p</div><div class=\"summary-val\">{ostatni.Temp10p} °C</div></div>");
+            sb.AppendLine($"            <div class=\"summary-cell\"><div class=\"summary-lbl\">Woda Chłodząca</div><div class=\"summary-val\">{ostatni.TempWoda} °C</div></div>");
+            sb.AppendLine($"            <div class=\"summary-cell\"><div class=\"summary-lbl\">Temp. Dnia</div><div class=\"summary-val\">{ostatni.TempDnia} °C</div></div>");
             sb.AppendLine("        </div>");
             sb.AppendLine("    </div>");
 
             sb.AppendLine("    <div class=\"section-title\">Ostatnie Pomiary (Karty Rekordów)</div>");
 
-            for (var i = ostatniePomiary.Count - 1; i >= 0; i--)
+            // KARTY REKORDÓW (Najnowsze na samej górze)
+            for (int i = pomiary.Count - 1; i >= 0; i--)
             {
-                var r = ostatniePomiary[i];
-                var badgeClass = r.Zawor.Trim().ToUpperInvariant() == "ON" ? "badge-on" : "badge-off";
+                var r = pomiary[i];
+                string badgeClass = r.Zawor.Trim().ToUpper() == "ON" ? "badge-on" : "badge-off";
 
                 sb.AppendLine("    <div class=\"card\">");
                 sb.AppendLine("        <div class=\"card-top\">");
@@ -135,7 +142,6 @@ namespace TemperatureController.Services
                 sb.AppendLine("            </div>");
                 sb.AppendLine("        </div>");
 
-                // Restored: detailed measurement content in each card.
                 sb.AppendLine("        <table class=\"metrics-table\">");
                 sb.AppendLine("            <tr>");
                 sb.AppendLine("                <td>");
@@ -160,23 +166,17 @@ namespace TemperatureController.Services
                 sb.AppendLine("                </td>");
                 sb.AppendLine("            </tr>");
                 sb.AppendLine("        </table>");
-
                 sb.AppendLine("    </div>");
             }
 
-            sb.AppendLine("    <div class=\"footer\">Raport wygenerowany automatycznie z aplikacji C# • Dostosowano do widoku mobilnego</div>");
+            sb.AppendLine("    <div class=\"footer\">");
+            sb.AppendLine("        Raport wygenerowany automatycznie z aplikacji C# • Dostosowano do widoku mobilnego");
+            sb.AppendLine("    </div>");
             sb.AppendLine("</body>");
             sb.AppendLine("</html>");
 
-            var htmlContent = sb.ToString();
-
             EnsureDirectoryForFile(outputHtmlPath);
-            if (!IsFileContentDifferent(outputHtmlPath, htmlContent))
-            {
-                return;
-            }
-
-            WriteHtmlAtomicWithRetry(outputHtmlPath, htmlContent);
+            WriteHtmlAtomicWithRetry(outputHtmlPath, sb.ToString());
         }
 
         /// <summary>
