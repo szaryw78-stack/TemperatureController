@@ -237,13 +237,8 @@
                     // Always refresh online snapshot CSV (header + last 10 records).
                     SaveLastTenRecordsSnapshot();
 
-                    // Przywrócone: tak jak wcześniej, po wysyłce payload/csv.
-                    HandleRecordingTransition();
-                    UpdateSessionEnergy(powerMetrics);
-                    ApplySessionEnergyToPowerMetrics(powerMetrics);
-
-                    // Dashboard refresh delay
-                    await Task.Delay(TimeSpan.FromSeconds(Math.Max(1, cfg.DashboardRefreshIntervalSec)), stoppingToken);
+                    // Generate mobile HTML based on the exported online CSV.
+                    SaveOnlineHtmlReport();
                 }
                 catch (Exception ex)
                 {
@@ -724,6 +719,46 @@
             catch (Exception ex)
             {
                 Console.WriteLine($"Session energy state save error: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Generates online HTML report from configured online CSV snapshot path.
+        /// </summary>
+        private void SaveOnlineHtmlReport()
+        {
+            try
+            {
+                if (!_processExportOptions.GenerateOnlineHtml)
+                {
+                    return;
+                }
+
+                var csvInput = (_processExportOptions.OnlineSnapshotFilePath ?? string.Empty).Trim();
+                var htmlOutput = (_processExportOptions.OnlineHtmlFilePath ?? string.Empty).Trim();
+
+                if (string.IsNullOrWhiteSpace(csvInput) || string.IsNullOrWhiteSpace(htmlOutput))
+                {
+                    return;
+                }
+
+                if (!File.Exists(csvInput))
+                {
+                    return;
+                }
+
+                // Ensure destination directory exists.
+                var htmlDir = Path.GetDirectoryName(htmlOutput);
+                if (!string.IsNullOrWhiteSpace(htmlDir))
+                {
+                    Directory.CreateDirectory(htmlDir);
+                }
+
+                ProcesReportGenerator.ConvertCsvToMobileHtml(csvInput, htmlOutput);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Błąd generowania raportu HTML: {ex.Message}");
             }
         }
     }
