@@ -109,12 +109,12 @@ namespace TemperatureController.Services
             sb.AppendLine("        <div class=\"summary-grid\">");
             sb.AppendLine($"            <div class=\"summary-cell\"><div class=\"summary-lbl\">Temp. Keg</div><div class=\"summary-val\">{ostatni.TempKeg} °C</div></div>");
             sb.AppendLine($"            <div class=\"summary-cell\"><div class=\"summary-lbl\">Temp. Bufor</div><div class=\"summary-val\">{ostatni.TempBufor} °C</div></div>");
-            sb.AppendLine($"            <div class=\"summary-cell\"><div class=\"summary-lbl\">Temp. Głowica</div><div class=\"summary-val\" style=\"color: #f43f5e;\">{ostatni.TempGlowica} °C</div></div>");
+            sb.AppendLine($"            <div class=\"summary-cell\"><div class=\"summary-lbl\">Temp. 10p</div><div class=\"summary-val\">{ostatni.Temp10p} °C</div></div>");
             sb.AppendLine("        </div>");
 
             // Rząd 2: 10p, Woda chłodząca, Temp. Dnia
             sb.AppendLine("        <div class=\"summary-grid\">");
-            sb.AppendLine($"            <div class=\"summary-cell\"><div class=\"summary-lbl\">Temp. 10p</div><div class=\"summary-val\">{ostatni.Temp10p} °C</div></div>");
+            sb.AppendLine($"            <div class=\"summary-cell\"><div class=\"summary-lbl\">Temp. Głowica</div><div class=\"summary-val\">{ostatni.TempGlowica} °C</div></div>");
             sb.AppendLine($"            <div class=\"summary-cell\"><div class=\"summary-lbl\">Woda Chłodząca</div><div class=\"summary-val\">{ostatni.TempWoda} °C</div></div>");
             sb.AppendLine($"            <div class=\"summary-cell\"><div class=\"summary-lbl\">Temp. Dnia</div><div class=\"summary-val\">{ostatni.TempDnia} °C</div></div>");
             sb.AppendLine("        </div>");
@@ -150,7 +150,7 @@ namespace TemperatureController.Services
                 sb.AppendLine($"                        <div class=\"metric-row\"><span class=\"m-name\">Keg:</span><span class=\"m-val\">{r.TempKeg}</span></div>");
                 sb.AppendLine($"                        <div class=\"metric-row\"><span class=\"m-name\">Bufor:</span><span class=\"m-val\">{r.TempBufor}</span></div>");
                 sb.AppendLine($"                        <div class=\"metric-row\"><span class=\"m-name\">10p:</span><span class=\"m-val\">{r.Temp10p}</span></div>");
-                sb.AppendLine($"                        <div class=\"metric-row\"><span class=\"m-name\">Głowica:</span><span class=\"m-val m-val-highlight\">{r.TempGlowica}</span></div>");
+                sb.AppendLine($"                        <div class=\"metric-row\"><span class=\"m-name\">Głowica:</span><span class=\"m-val\">{r.TempGlowica}</span></div>");
                 sb.AppendLine($"                        <div class=\"metric-row\"><span class=\"m-name\">Woda chłodząca:</span><span class=\"m-val\">{r.TempWoda}</span></div>");
                 sb.AppendLine("                    </div>");
                 sb.AppendLine("                </td>");
