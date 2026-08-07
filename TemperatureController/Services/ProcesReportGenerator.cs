@@ -97,12 +97,10 @@ namespace TemperatureController.Services
             sb.AppendLine("    </style>");
             sb.AppendLine("</head>");
             sb.AppendLine("<body>");
-
             sb.AppendLine("    <div class=\"header\">");
             sb.AppendLine("        <h1>⚙️ Monitor Procesu Online</h1>");
             sb.AppendLine($"        <p>Ostatnia aktualizacja: {ostatni.CzasZapisu} | Liczba rekordów: {pomiary.Count}</p>");
             sb.AppendLine("    </div>");
-
             sb.AppendLine("    <div class=\"summary-container\">");
             sb.AppendLine("        <div class=\"summary-grid\">");
             sb.AppendLine($"            <div class=\"summary-cell\"><div class=\"summary-lbl\">Temp. Keg</div><div class=\"summary-val\">{ostatni.TempKeg} °C</div></div>");
@@ -117,8 +115,7 @@ namespace TemperatureController.Services
             sb.AppendLine("    </div>");
 
             sb.AppendLine("    <div class=\"section-title\">Ostatnie Pomiary (Karty Rekordów)</div>");
-
-            for (int i = pomiary.Count - 1; i >= 0; i--)
+            for (var i = pomiary.Count - 1; i >= 0; i--)
             {
                 var r = pomiary[i];
                 var badgeClass = r.Zawor.Trim().ToUpperInvariant() == "ON" ? "badge-on" : "badge-off";
@@ -136,31 +133,6 @@ namespace TemperatureController.Services
                 sb.AppendLine("                </div>");
                 sb.AppendLine("            </div>");
                 sb.AppendLine("        </div>");
-
-                sb.AppendLine("        <table class=\"metrics-table\">");
-                sb.AppendLine("            <tr>");
-                sb.AppendLine("                <td>");
-                sb.AppendLine("                    <div class=\"group-box\">");
-                sb.AppendLine("                        <div class=\"group-lbl\">🌡️ Temperatury (°C)</div>");
-                sb.AppendLine($"                        <div class=\"metric-row\"><span class=\"m-name\">Keg:</span><span class=\"m-val\">{r.TempKeg}</span></div>");
-                sb.AppendLine($"                        <div class=\"metric-row\"><span class=\"m-name\">Bufor:</span><span class=\"m-val\">{r.TempBufor}</span></div>");
-                sb.AppendLine($"                        <div class=\"metric-row\"><span class=\"m-name\">10p:</span><span class=\"m-val\">{r.Temp10p}</span></div>");
-                sb.AppendLine($"                        <div class=\"metric-row\"><span class=\"m-name\">Głowica:</span><span class=\"m-val m-val-highlight\">{r.TempGlowica}</span></div>");
-                sb.AppendLine($"                        <div class=\"metric-row\"><span class=\"m-name\">Woda chłodząca:</span><span class=\"m-val\">{r.TempWoda}</span></div>");
-                sb.AppendLine("                    </div>");
-                sb.AppendLine("                </td>");
-                sb.AppendLine("                <td>");
-                sb.AppendLine("                    <div class=\"group-box\">");
-                sb.AppendLine("                        <div class=\"group-lbl\">⚡ Elektryka & Otoczenie</div>");
-                sb.AppendLine($"                        <div class=\"metric-row\"><span class=\"m-name\">Napięcie:</span><span class=\"m-val\">{r.Napiecie} V</span></div>");
-                sb.AppendLine($"                        <div class=\"metric-row\"><span class=\"m-name\">Prąd / Moc:</span><span class=\"m-val\">{r.Prad} A / {r.Moc} W</span></div>");
-                sb.AppendLine($"                        <div class=\"metric-row\"><span class=\"m-name\">Zużycie:</span><span class=\"m-val\">{r.Zuzycie} Wh</span></div>");
-                sb.AppendLine($"                        <div class=\"metric-row\"><span class=\"m-name\">Ciśnienie:</span><span class=\"m-val\">{r.Cisnienie} hPa</span></div>");
-                sb.AppendLine($"                        <div class=\"metric-row\"><span class=\"m-name\">Temp. Zewn:</span><span class=\"m-val\">{r.TempZewn} °C</span></div>");
-                sb.AppendLine("                    </div>");
-                sb.AppendLine("                </td>");
-                sb.AppendLine("            </tr>");
-                sb.AppendLine("        </table>");
                 sb.AppendLine("    </div>");
             }
 
@@ -168,7 +140,17 @@ namespace TemperatureController.Services
             sb.AppendLine("</body>");
             sb.AppendLine("</html>");
 
-            File.WriteAllText(outputHtmlPath, sb.ToString(), Encoding.UTF8);
+            var htmlContent = sb.ToString();
+
+            EnsureDirectoryForFile(outputHtmlPath);
+
+            // Avoid unnecessary disk writes (important for Google Drive sync).
+            if (!IsFileContentDifferent(outputHtmlPath, htmlContent))
+            {
+                return;
+            }
+
+            WriteHtmlAtomicWithRetry(outputHtmlPath, htmlContent);
         }
 
         /// <summary>
@@ -178,50 +160,166 @@ namespace TemperatureController.Services
         /// <returns>Lista rekordów procesu.</returns>
         private static List<PomiarProcesu> OdczytajPomiaryZCsv(string csvFilePath)
         {
+            const int maxAttempts = 5;
             var poms = new List<PomiarProcesu>();
 
-            // Shared read to avoid conflict when CSV is being updated.
-            using var stream = new FileStream(csvFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-            using var reader = new StreamReader(stream, Encoding.UTF8);
-
-            string? rawLine;
-            while ((rawLine = reader.ReadLine()) is not null)
+            for (var attempt = 1; attempt <= maxAttempts; attempt++)
             {
-                var line = rawLine.Replace("\\_", "_").Trim();
-                if (string.IsNullOrWhiteSpace(line) ||
-                    line.StartsWith("!") ||
-                    line.StartsWith("Bhttp") ||
-                    line.StartsWith("Czas_Zapisu"))
+                try
                 {
-                    continue;
-                }
+                    using var stream = new FileStream(
+                        csvFilePath,
+                        FileMode.Open,
+                        FileAccess.Read,
+                        FileShare.ReadWrite | FileShare.Delete);
 
-                var parts = line.Split(';');
-                if (parts.Length >= 15)
-                {
-                    poms.Add(new PomiarProcesu
+                    using var reader = new StreamReader(stream, Encoding.UTF8);
+
+                    string? rawLine;
+                    while ((rawLine = reader.ReadLine()) is not null)
                     {
-                        CzasZapisu = parts[0].Trim(),
-                        CzasProcesu = parts[1].Trim(),
-                        TempKeg = parts[2].Trim(),
-                        TempBufor = parts[3].Trim(),
-                        Temp10p = parts[4].Trim(),
-                        TempGlowica = parts[5].Trim(),
-                        TempWoda = parts[6].Trim(),
-                        Napiecie = parts[7].Trim(),
-                        Prad = parts[8].Trim(),
-                        Moc = parts[9].Trim(),
-                        Zuzycie = parts[10].Trim(),
-                        TempZewn = parts[11].Trim(),
-                        Cisnienie = parts[12].Trim(),
-                        Zawor = parts[13].Trim(),
-                        TempDnia = parts[14].Trim(),
-                        Komentarz = parts.Length > 15 ? parts[15].Split('"')[0].Trim() : string.Empty
-                    });
+                        var line = rawLine.Replace("\\_", "_").Trim();
+                        if (string.IsNullOrWhiteSpace(line) ||
+                            line.StartsWith("!") ||
+                            line.StartsWith("Bhttp") ||
+                            line.StartsWith("Czas_Zapisu"))
+                        {
+                            continue;
+                        }
+
+                        var parts = line.Split(';');
+                        if (parts.Length >= 15)
+                        {
+                            poms.Add(new PomiarProcesu
+                            {
+                                CzasZapisu = parts[0].Trim(),
+                                CzasProcesu = parts[1].Trim(),
+                                TempKeg = parts[2].Trim(),
+                                TempBufor = parts[3].Trim(),
+                                Temp10p = parts[4].Trim(),
+                                TempGlowica = parts[5].Trim(),
+                                TempWoda = parts[6].Trim(),
+                                Napiecie = parts[7].Trim(),
+                                Prad = parts[8].Trim(),
+                                Moc = parts[9].Trim(),
+                                Zuzycie = parts[10].Trim(),
+                                TempZewn = parts[11].Trim(),
+                                Cisnienie = parts[12].Trim(),
+                                Zawor = parts[13].Trim(),
+                                TempDnia = parts[14].Trim(),
+                                Komentarz = parts.Length > 15 ? parts[15].Split('"')[0].Trim() : string.Empty
+                            });
+                        }
+                    }
+
+                    return poms;
+                }
+                catch (IOException) when (attempt < maxAttempts)
+                {
+                    System.Threading.Thread.Sleep(80 * attempt);
                 }
             }
 
             return poms;
+        }
+
+        /// <summary>
+        /// Ensures that output file directory exists.
+        /// </summary>
+        /// <param name="filePath">Target file path.</param>
+        private static void EnsureDirectoryForFile(string filePath)
+        {
+            var directory = Path.GetDirectoryName(filePath);
+            if (!string.IsNullOrWhiteSpace(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+        }
+
+        /// <summary>
+        /// Checks whether file content differs from new content.
+        /// </summary>
+        /// <param name="filePath">Target file path.</param>
+        /// <param name="newContent">Generated content to compare.</param>
+        /// <returns><see langword="true"/> if content is different; otherwise <see langword="false"/>.</returns>
+        private static bool IsFileContentDifferent(string filePath, string newContent)
+        {
+            if (!File.Exists(filePath))
+            {
+                return true;
+            }
+
+            try
+            {
+                using var stream = new FileStream(
+                    filePath,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.ReadWrite | FileShare.Delete);
+
+                using var reader = new StreamReader(stream, Encoding.UTF8);
+                var current = reader.ReadToEnd();
+                return !string.Equals(current, newContent, StringComparison.Ordinal);
+            }
+            catch
+            {
+                // If compare fails, force rewrite.
+                return true;
+            }
+        }
+
+        /// <summary>
+        /// Writes HTML file atomically with retry to reduce lock contention with sync tools.
+        /// </summary>
+        /// <param name="outputHtmlPath">Final HTML file path.</param>
+        /// <param name="content">HTML content.</param>
+        private static void WriteHtmlAtomicWithRetry(string outputHtmlPath, string content)
+        {
+            const int maxAttempts = 5;
+            var tempPath = outputHtmlPath + ".tmp";
+
+            for (var attempt = 1; attempt <= maxAttempts; attempt++)
+            {
+                try
+                {
+                    using (var stream = new FileStream(
+                        tempPath,
+                        FileMode.Create,
+                        FileAccess.Write,
+                        FileShare.ReadWrite | FileShare.Delete,
+                        bufferSize: 4096,
+                        FileOptions.WriteThrough))
+                    using (var writer = new StreamWriter(stream, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false)))
+                    {
+                        writer.Write(content);
+                        writer.Flush();
+                        stream.Flush(true);
+                    }
+
+                    File.Move(tempPath, outputHtmlPath, overwrite: true);
+                    return;
+                }
+                catch (IOException) when (attempt < maxAttempts)
+                {
+                    System.Threading.Thread.Sleep(100 * attempt);
+                }
+                finally
+                {
+                    try
+                    {
+                        if (File.Exists(tempPath))
+                        {
+                            File.Delete(tempPath);
+                        }
+                    }
+                    catch
+                    {
+                        // Best effort cleanup.
+                    }
+                }
+            }
+
+            throw new IOException($"Nie udało się zapisać pliku HTML po {maxAttempts} próbach: {outputHtmlPath}");
         }
     }
 }
