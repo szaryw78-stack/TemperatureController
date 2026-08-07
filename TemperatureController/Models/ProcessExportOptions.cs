@@ -21,5 +21,10 @@ namespace TemperatureController.Models
         /// Gets or sets a value indicating whether HTML generation is enabled.
         /// </summary>
         public bool GenerateOnlineHtml { get; set; } = true;
+
+        /// <summary>
+        /// Gets or sets minimum export interval in seconds.
+        /// </summary>
+        public int OnlineExportIntervalSec { get; set; } = 15;
     }
 }

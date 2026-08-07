@@ -41,6 +41,9 @@
         private DateTime? _lastEnergySampleUtc;
         private bool _previousRecordingState;
 
+        private DateTime _lastOnlineExportUtc = DateTime.MinValue;
+        private readonly TimeSpan _onlineExportInterval;
+
         /// <summary>
         /// Initializes a new instance of the <see cref="ProcessMonitorService"/> class.
         /// </summary>
@@ -67,6 +70,7 @@
             _state = state;
             _configFilePath = Path.Combine(environment.ContentRootPath, "deviceconfiguration.json");
             _processExportOptions = processExportOptions.Value ?? new ProcessExportOptions();
+            _onlineExportInterval = TimeSpan.FromSeconds(Math.Clamp(_processExportOptions.OnlineExportIntervalSec, 5, 300));
 
             _sessionEnergyStateFilePath = Path.Combine(environment.ContentRootPath, "process-energy-session.json");
             LoadSessionEnergyState();
@@ -239,6 +243,8 @@
 
                     // Generate mobile HTML based on the exported online CSV.
                     SaveOnlineHtmlReport();
+
+                    RunOnlineExportIfDue();
                 }
                 catch (Exception ex)
                 {
@@ -252,7 +258,8 @@
         /// Creates online CSV snapshot file with header and the last 10 data records
         /// from the current process CSV file.
         /// </summary>
-        private void SaveLastTenRecordsSnapshot()
+        /// <returns><see langword="true"/> when snapshot file was updated; otherwise <see langword="false"/>.</returns>
+        private bool SaveLastTenRecordsSnapshot()
         {
             try
             {
@@ -264,13 +271,13 @@
 
                 if (!File.Exists(sourceFile))
                 {
-                    return;
+                    return false;
                 }
 
                 var targetFile = (_processExportOptions.OnlineSnapshotFilePath ?? string.Empty).Trim();
                 if (string.IsNullOrWhiteSpace(targetFile))
                 {
-                    return;
+                    return false;
                 }
 
                 var targetDirectory = Path.GetDirectoryName(targetFile);
@@ -312,17 +319,18 @@
 
                 var newSnapshot = snapshotBuilder.ToString();
 
-                // Skip write when unchanged to reduce sync churn.
                 if (!IsContentDifferent(targetFile, newSnapshot))
                 {
-                    return;
+                    return false;
                 }
 
                 WriteTextAtomicallyWithRetry(targetFile, newSnapshot);
+                return true;
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Błąd zapisu pliku ProcesOnline.csv: {ex.Message}");
+                return false;
             }
         }
 
@@ -405,7 +413,7 @@
             }
 
             var pumpEntry = config.Tuya.FirstOrDefault(x =>
-                string.Equals(x.Key, "Pump", StringComparison.OrdinalIgnoreCase));
+                string.Equals(x.Key, "Pump", StringComparer.OrdinalIgnoreCase));
 
             return pumpEntry.Value?.DeviceId;
         }
@@ -827,6 +835,26 @@
             {
                 Console.WriteLine($"Błąd generowania raportu HTML: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Runs online CSV/HTML export only when minimum interval elapsed.
+        /// </summary>
+        private void RunOnlineExportIfDue()
+        {
+            var nowUtc = DateTime.UtcNow;
+            if ((nowUtc - _lastOnlineExportUtc) < _onlineExportInterval)
+            {
+                return;
+            }
+
+            var csvChanged = SaveLastTenRecordsSnapshot();
+            if (csvChanged)
+            {
+                SaveOnlineHtmlReport();
+            }
+
+            _lastOnlineExportUtc = nowUtc;
         }
     }
 
