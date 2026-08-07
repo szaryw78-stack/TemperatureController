@@ -107,10 +107,10 @@ namespace TemperatureController.Services
             sb.AppendLine("        <div class=\"summary-grid\">");
             sb.AppendLine($"            <div class=\"summary-cell\"><div class=\"summary-lbl\">Temp. Keg</div><div class=\"summary-val\">{ostatni.TempKeg} °C</div></div>");
             sb.AppendLine($"            <div class=\"summary-cell\"><div class=\"summary-lbl\">Temp. Bufor</div><div class=\"summary-val\">{ostatni.TempBufor} °C</div></div>");
-            sb.AppendLine($"            <div class=\"summary-cell\"><div class=\"summary-lbl\">Temp. Głowica</div><div class=\"summary-val\" style=\"color: #f43f5e;\">{ostatni.TempGlowica} °C</div></div>");
+            sb.AppendLine($"            <div class=\"summary-cell\"><div class=\"summary-lbl\">Temp. 10p</div><div class=\"summary-val\">{ostatni.Temp10p} °C</div></div>");
             sb.AppendLine("        </div>");
             sb.AppendLine("        <div class=\"summary-grid\">");
-            sb.AppendLine($"            <div class=\"summary-cell\"><div class=\"summary-lbl\">Temp. 10p</div><div class=\"summary-val\">{ostatni.Temp10p} °C</div></div>");
+            sb.AppendLine($"            <div class=\"summary-cell\"><div class=\"summary-lbl\">Temp. Głowica</div><div class=\"summary-val\">{ostatni.TempGlowica} °C</div></div>");
             sb.AppendLine($"            <div class=\"summary-cell\"><div class=\"summary-lbl\">Woda Chłodząca</div><div class=\"summary-val\">{ostatni.TempWoda} °C</div></div>");
             sb.AppendLine($"            <div class=\"summary-cell\"><div class=\"summary-lbl\">Temp. Dnia</div><div class=\"summary-val\">{ostatni.TempDnia} °C</div></div>");
             sb.AppendLine("        </div>");
