@@ -413,7 +413,7 @@
             }
 
             var pumpEntry = config.Tuya.FirstOrDefault(x =>
-                string.Equals(x.Key, "Pump", StringComparer.OrdinalIgnoreCase));
+                string.Equals(x.Key, "Pump", StringComparison.OrdinalIgnoreCase));
 
             return pumpEntry.Value?.DeviceId;
         }
