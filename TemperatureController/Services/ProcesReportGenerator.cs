@@ -295,53 +295,34 @@ namespace TemperatureController.Services
         }
 
         /// <summary>
-        /// Writes HTML file atomically with retry to reduce lock contention with sync tools.
+        /// Writes HTML file directly with retry to avoid rename issues on rclone mount.
         /// </summary>
         /// <param name="outputHtmlPath">Final HTML file path.</param>
         /// <param name="content">HTML content.</param>
         private static void WriteHtmlAtomicWithRetry(string outputHtmlPath, string content)
         {
-            const int maxAttempts = 5;
-            var tempPath = outputHtmlPath + ".tmp";
+            const int maxAttempts = 8;
 
             for (var attempt = 1; attempt <= maxAttempts; attempt++)
             {
                 try
                 {
-                    using (var stream = new FileStream(
-                        tempPath,
+                    // Direct write is more reliable on FUSE/rclone than tmp+move.
+                    using var stream = new FileStream(
+                        outputHtmlPath,
                         FileMode.Create,
                         FileAccess.Write,
-                        FileShare.ReadWrite | FileShare.Delete,
-                        bufferSize: 4096,
-                        FileOptions.WriteThrough))
-                    using (var writer = new StreamWriter(stream, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false)))
-                    {
-                        writer.Write(content);
-                        writer.Flush();
-                        stream.Flush(true);
-                    }
+                        FileShare.ReadWrite | FileShare.Delete);
 
-                    File.Move(tempPath, outputHtmlPath, overwrite: true);
+                    using var writer = new StreamWriter(stream, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+                    writer.Write(content);
+                    writer.Flush();
+                    stream.Flush(true);
                     return;
                 }
                 catch (IOException) when (attempt < maxAttempts)
                 {
-                    System.Threading.Thread.Sleep(100 * attempt);
-                }
-                finally
-                {
-                    try
-                    {
-                        if (File.Exists(tempPath))
-                        {
-                            File.Delete(tempPath);
-                        }
-                    }
-                    catch
-                    {
-                        // Best effort cleanup.
-                    }
+                    System.Threading.Thread.Sleep(150 * attempt);
                 }
             }
 

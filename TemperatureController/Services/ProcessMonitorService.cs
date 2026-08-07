@@ -353,49 +353,38 @@
         }
 
         /// <summary>
-        /// Writes file atomically with retry to reduce lock conflicts with sync software.
+        /// Writes file directly with retry to avoid rename issues on rclone mount.
         /// </summary>
         /// <param name="targetFile">Final destination path.</param>
         /// <param name="content">File content.</param>
         private static void WriteTextAtomicallyWithRetry(string targetFile, string content)
         {
-            const int maxAttempts = 6;
-            var tempFile = targetFile + ".tmp";
+            const int maxAttempts = 8;
 
             for (var attempt = 1; attempt <= maxAttempts; attempt++)
             {
                 try
                 {
-                    using (var fs = new FileStream(tempFile, FileMode.Create, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete))
-                    using (var sw = new StreamWriter(fs, new System.Text.UTF8Encoding(false)))
-                    {
-                        sw.Write(content);
-                        sw.Flush();
-                        fs.Flush(true);
-                    }
+                    // Direct overwrite is safer for rclone VFS than temp file rename.
+                    using var fs = new FileStream(
+                        targetFile,
+                        FileMode.Create,
+                        FileAccess.Write,
+                        FileShare.ReadWrite | FileShare.Delete);
 
-                    File.Move(tempFile, targetFile, overwrite: true);
+                    using var sw = new StreamWriter(fs, new System.Text.UTF8Encoding(false));
+                    sw.Write(content);
+                    sw.Flush();
+                    fs.Flush(true);
                     return;
                 }
                 catch (IOException) when (attempt < maxAttempts)
                 {
-                    System.Threading.Thread.Sleep(120 * attempt);
-                }
-                finally
-                {
-                    try
-                    {
-                        if (File.Exists(tempFile))
-                        {
-                            File.Delete(tempFile);
-                        }
-                    }
-                    catch
-                    {
-                        // Best-effort cleanup.
-                    }
+                    System.Threading.Thread.Sleep(150 * attempt);
                 }
             }
+
+            throw new IOException($"Nie udało się zapisać pliku po {maxAttempts} próbach: {targetFile}");
         }
 
         /// <summary>
