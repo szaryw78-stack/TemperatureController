@@ -273,7 +273,6 @@
                     return;
                 }
 
-                // Ensure target directory exists.
                 var targetDirectory = Path.GetDirectoryName(targetFile);
                 if (!string.IsNullOrWhiteSpace(targetDirectory))
                 {
@@ -283,8 +282,7 @@
                 string header;
                 var lastDataRows = new Queue<string>(capacity: 10);
 
-                // Read source with shared access because file is updated by logger.
-                using (var sourceStream = new FileStream(sourceFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                using (var sourceStream = new FileStream(sourceFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
                 using (var reader = new StreamReader(sourceStream))
                 {
                     header = reader.ReadLine() ?? CsvHeader;
@@ -305,18 +303,98 @@
                     }
                 }
 
-                // Overwrite online file with latest snapshot.
-                using var writer = new StreamWriter(targetFile, append: false);
-                writer.WriteLine(header);
-
+                var snapshotBuilder = new System.Text.StringBuilder();
+                snapshotBuilder.AppendLine(header);
                 foreach (var row in lastDataRows)
                 {
-                    writer.WriteLine(row);
+                    snapshotBuilder.AppendLine(row);
                 }
+
+                var newSnapshot = snapshotBuilder.ToString();
+
+                // Skip write when unchanged to reduce sync churn.
+                if (!IsContentDifferent(targetFile, newSnapshot))
+                {
+                    return;
+                }
+
+                WriteTextAtomicallyWithRetry(targetFile, newSnapshot);
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Błąd zapisu pliku ProcesOnline.csv: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Checks if target file content differs from new content.
+        /// </summary>
+        /// <param name="filePath">Target file path.</param>
+        /// <param name="newContent">New content to compare.</param>
+        /// <returns><see langword="true"/> when different; otherwise <see langword="false"/>.</returns>
+        private static bool IsContentDifferent(string filePath, string newContent)
+        {
+            if (!File.Exists(filePath))
+            {
+                return true;
+            }
+
+            try
+            {
+                using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+                using var reader = new StreamReader(stream);
+                var currentContent = reader.ReadToEnd();
+                return !string.Equals(currentContent, newContent, StringComparison.Ordinal);
+            }
+            catch
+            {
+                return true;
+            }
+        }
+
+        /// <summary>
+        /// Writes file atomically with retry to reduce lock conflicts with sync software.
+        /// </summary>
+        /// <param name="targetFile">Final destination path.</param>
+        /// <param name="content">File content.</param>
+        private static void WriteTextAtomicallyWithRetry(string targetFile, string content)
+        {
+            const int maxAttempts = 6;
+            var tempFile = targetFile + ".tmp";
+
+            for (var attempt = 1; attempt <= maxAttempts; attempt++)
+            {
+                try
+                {
+                    using (var fs = new FileStream(tempFile, FileMode.Create, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete))
+                    using (var sw = new StreamWriter(fs, new System.Text.UTF8Encoding(false)))
+                    {
+                        sw.Write(content);
+                        sw.Flush();
+                        fs.Flush(true);
+                    }
+
+                    File.Move(tempFile, targetFile, overwrite: true);
+                    return;
+                }
+                catch (IOException) when (attempt < maxAttempts)
+                {
+                    System.Threading.Thread.Sleep(120 * attempt);
+                }
+                finally
+                {
+                    try
+                    {
+                        if (File.Exists(tempFile))
+                        {
+                            File.Delete(tempFile);
+                        }
+                    }
+                    catch
+                    {
+                        // Best-effort cleanup.
+                    }
+                }
             }
         }
 
