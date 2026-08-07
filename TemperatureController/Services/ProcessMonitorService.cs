@@ -239,10 +239,10 @@
                     }
 
                     // Always refresh online snapshot CSV (header + last 10 records).
-                    SaveLastTenRecordsSnapshot();
+                   // SaveLastTenRecordsSnapshot();
 
                     // Generate mobile HTML based on the exported online CSV.
-                    SaveOnlineHtmlReport();
+                   // SaveOnlineHtmlReport();
 
                     RunOnlineExportIfDue();
                 }
@@ -854,6 +854,7 @@
                 SaveOnlineHtmlReport();
             }
 
+            // Update timestamp only after export attempt window.
             _lastOnlineExportUtc = nowUtc;
         }
     }
