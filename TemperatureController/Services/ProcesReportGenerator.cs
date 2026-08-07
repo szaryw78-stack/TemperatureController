@@ -53,7 +53,10 @@ namespace TemperatureController.Services
                 throw new ArgumentException("Lista pomiarów nie może być pusta.", nameof(pomiary));
             }
 
-            var ostatni = pomiary.Last();
+            // Keep only last 10 records for online/mobile report.
+            var ostatniePomiary = pomiary.TakeLast(10).ToList();
+            var ostatni = ostatniePomiary.Last();
+
             var sb = new StringBuilder();
 
             sb.AppendLine("<!DOCTYPE html>");
@@ -97,27 +100,25 @@ namespace TemperatureController.Services
             sb.AppendLine("    </style>");
             sb.AppendLine("</head>");
             sb.AppendLine("<body>");
+
             sb.AppendLine("    <div class=\"header\">");
             sb.AppendLine("        <h1>⚙️ Monitor Procesu Online</h1>");
-            sb.AppendLine($"        <p>Ostatnia aktualizacja: {ostatni.CzasZapisu} | Liczba rekordów: {pomiary.Count}</p>");
+            sb.AppendLine($"        <p>Ostatnia aktualizacja: {ostatni.CzasZapisu} | Liczba rekordów: {ostatniePomiary.Count}</p>");
             sb.AppendLine("    </div>");
+
             sb.AppendLine("    <div class=\"summary-container\">");
             sb.AppendLine("        <div class=\"summary-grid\">");
             sb.AppendLine($"            <div class=\"summary-cell\"><div class=\"summary-lbl\">Temp. Keg</div><div class=\"summary-val\">{ostatni.TempKeg} °C</div></div>");
             sb.AppendLine($"            <div class=\"summary-cell\"><div class=\"summary-lbl\">Temp. Bufor</div><div class=\"summary-val\">{ostatni.TempBufor} °C</div></div>");
             sb.AppendLine($"            <div class=\"summary-cell\"><div class=\"summary-lbl\">Temp. 10p</div><div class=\"summary-val\">{ostatni.Temp10p} °C</div></div>");
             sb.AppendLine("        </div>");
-            sb.AppendLine("        <div class=\"summary-grid\">");
-            sb.AppendLine($"            <div class=\"summary-cell\"><div class=\"summary-lbl\">Temp. Głowica</div><div class=\"summary-val\">{ostatni.TempGlowica} °C</div></div>");
-            sb.AppendLine($"            <div class=\"summary-cell\"><div class=\"summary-lbl\">Woda Chłodząca</div><div class=\"summary-val\">{ostatni.TempWoda} °C</div></div>");
-            sb.AppendLine($"            <div class=\"summary-cell\"><div class=\"summary-lbl\">Temp. Dnia</div><div class=\"summary-val\">{ostatni.TempDnia} °C</div></div>");
-            sb.AppendLine("        </div>");
             sb.AppendLine("    </div>");
 
             sb.AppendLine("    <div class=\"section-title\">Ostatnie Pomiary (Karty Rekordów)</div>");
-            for (var i = pomiary.Count - 1; i >= 0; i--)
+
+            for (var i = ostatniePomiary.Count - 1; i >= 0; i--)
             {
-                var r = pomiary[i];
+                var r = ostatniePomiary[i];
                 var badgeClass = r.Zawor.Trim().ToUpperInvariant() == "ON" ? "badge-on" : "badge-off";
 
                 sb.AppendLine("    <div class=\"card\">");
@@ -133,6 +134,33 @@ namespace TemperatureController.Services
                 sb.AppendLine("                </div>");
                 sb.AppendLine("            </div>");
                 sb.AppendLine("        </div>");
+
+                // Restored: detailed measurement content in each card.
+                sb.AppendLine("        <table class=\"metrics-table\">");
+                sb.AppendLine("            <tr>");
+                sb.AppendLine("                <td>");
+                sb.AppendLine("                    <div class=\"group-box\">");
+                sb.AppendLine("                        <div class=\"group-lbl\">🌡️ Temperatury (°C)</div>");
+                sb.AppendLine($"                        <div class=\"metric-row\"><span class=\"m-name\">Keg:</span><span class=\"m-val\">{r.TempKeg}</span></div>");
+                sb.AppendLine($"                        <div class=\"metric-row\"><span class=\"m-name\">Bufor:</span><span class=\"m-val\">{r.TempBufor}</span></div>");
+                sb.AppendLine($"                        <div class=\"metric-row\"><span class=\"m-name\">10p:</span><span class=\"m-val\">{r.Temp10p}</span></div>");
+                sb.AppendLine($"                        <div class=\"metric-row\"><span class=\"m-name\">Głowica:</span><span class=\"m-val m-val-highlight\">{r.TempGlowica}</span></div>");
+                sb.AppendLine($"                        <div class=\"metric-row\"><span class=\"m-name\">Woda chłodząca:</span><span class=\"m-val\">{r.TempWoda}</span></div>");
+                sb.AppendLine("                    </div>");
+                sb.AppendLine("                </td>");
+                sb.AppendLine("                <td>");
+                sb.AppendLine("                    <div class=\"group-box\">");
+                sb.AppendLine("                        <div class=\"group-lbl\">⚡ Elektryka & Otoczenie</div>");
+                sb.AppendLine($"                        <div class=\"metric-row\"><span class=\"m-name\">Napięcie:</span><span class=\"m-val\">{r.Napiecie} V</span></div>");
+                sb.AppendLine($"                        <div class=\"metric-row\"><span class=\"m-name\">Prąd / Moc:</span><span class=\"m-val\">{r.Prad} A / {r.Moc} W</span></div>");
+                sb.AppendLine($"                        <div class=\"metric-row\"><span class=\"m-name\">Zużycie:</span><span class=\"m-val\">{r.Zuzycie} Wh</span></div>");
+                sb.AppendLine($"                        <div class=\"metric-row\"><span class=\"m-name\">Ciśnienie:</span><span class=\"m-val\">{r.Cisnienie} hPa</span></div>");
+                sb.AppendLine($"                        <div class=\"metric-row\"><span class=\"m-name\">Temp. Zewn:</span><span class=\"m-val\">{r.TempZewn} °C</span></div>");
+                sb.AppendLine("                    </div>");
+                sb.AppendLine("                </td>");
+                sb.AppendLine("            </tr>");
+                sb.AppendLine("        </table>");
+
                 sb.AppendLine("    </div>");
             }
 
@@ -143,8 +171,6 @@ namespace TemperatureController.Services
             var htmlContent = sb.ToString();
 
             EnsureDirectoryForFile(outputHtmlPath);
-
-            // Avoid unnecessary disk writes (important for Google Drive sync).
             if (!IsFileContentDifferent(outputHtmlPath, htmlContent))
             {
                 return;
