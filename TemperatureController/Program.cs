@@ -22,6 +22,8 @@ builder.Services.AddScoped<IConfigFileService, ConfigFileService>();
 builder.Services.AddScoped<ICalibrationService, CalibrationService>();
 
 builder.Services.Configure<WeatherOptions>(builder.Configuration.GetSection("Weather"));
+builder.Services.Configure<ProcessExportOptions>(builder.Configuration.GetSection("ProcessExport")); // <-- DODANE
+
 builder.Services.AddHttpClient<IWeatherService, OpenMeteoWeatherService>(httpClient =>
 {
     httpClient.BaseAddress = new Uri("https://api.open-meteo.com");

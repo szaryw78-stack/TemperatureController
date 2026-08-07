@@ -2,6 +2,7 @@
 {
     using Microsoft.Extensions.Hosting;
     using Microsoft.AspNetCore.SignalR;
+    using Microsoft.Extensions.Options;
     using System.Text.Json;
     using TemperatureController.Models;
     using TemperatureController.Tuya;
@@ -17,6 +18,7 @@
         private readonly IHubContext<DashboardHub> _hubContext;
         private readonly ProcessStateManager _state;
         private readonly string _configFilePath;
+        private readonly ProcessExportOptions _processExportOptions;
         private DateTime _lastCsvLog = DateTime.MinValue;
         private DateTime _lastTuyaRefresh = DateTime.MinValue;
         private PowerMetrics _cachedPower = new PowerMetrics(); // Pamięć podręczna
@@ -48,13 +50,15 @@
         /// <param name="hub">SignalR hub context.</param>
         /// <param name="state">Shared process state.</param>
         /// <param name="environment">Host environment used to resolve configuration path.</param>
+        /// <param name="processExportOptions">Online CSV export options.</param>
         public ProcessMonitorService(
             HardwareService hardware,
             ITuyaService tuya,
             IWeatherService weatherService,
             IHubContext<DashboardHub> hub,
             ProcessStateManager state,
-            IHostEnvironment environment)
+            IHostEnvironment environment,
+            IOptions<ProcessExportOptions> processExportOptions)
         {
             _hardware = hardware;
             _tuya = tuya;
@@ -62,6 +66,7 @@
             _hubContext = hub;
             _state = state;
             _configFilePath = Path.Combine(environment.ContentRootPath, "deviceconfiguration.json");
+            _processExportOptions = processExportOptions.Value ?? new ProcessExportOptions();
 
             _sessionEnergyStateFilePath = Path.Combine(environment.ContentRootPath, "process-energy-session.json");
             LoadSessionEnergyState();
@@ -229,6 +234,9 @@
                         _lastCsvLog = DateTime.Now;
                     }
 
+                    // Always refresh online snapshot CSV (header + last 10 records).
+                    SaveLastTenRecordsSnapshot();
+
                     // Przywrócone: tak jak wcześniej, po wysyłce payload/csv.
                     HandleRecordingTransition();
                     UpdateSessionEnergy(powerMetrics);
@@ -244,6 +252,79 @@
                 }
             }
         }
+
+        /// <summary>
+        /// Creates online CSV snapshot file with header and the last 10 data records
+        /// from the current process CSV file.
+        /// </summary>
+        private void SaveLastTenRecordsSnapshot()
+        {
+            try
+            {
+                var sourceFile = _state.CurrentFileName;
+                if (!sourceFile.EndsWith(".csv", StringComparison.OrdinalIgnoreCase))
+                {
+                    sourceFile += ".csv";
+                }
+
+                if (!File.Exists(sourceFile))
+                {
+                    return;
+                }
+
+                var targetFile = (_processExportOptions.OnlineSnapshotFilePath ?? string.Empty).Trim();
+                if (string.IsNullOrWhiteSpace(targetFile))
+                {
+                    return;
+                }
+
+                // Ensure target directory exists.
+                var targetDirectory = Path.GetDirectoryName(targetFile);
+                if (!string.IsNullOrWhiteSpace(targetDirectory))
+                {
+                    Directory.CreateDirectory(targetDirectory);
+                }
+
+                string header;
+                var lastDataRows = new Queue<string>(capacity: 10);
+
+                // Read source with shared access because file is updated by logger.
+                using (var sourceStream = new FileStream(sourceFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                using (var reader = new StreamReader(sourceStream))
+                {
+                    header = reader.ReadLine() ?? CsvHeader;
+
+                    string? line;
+                    while ((line = reader.ReadLine()) is not null)
+                    {
+                        if (string.IsNullOrWhiteSpace(line))
+                        {
+                            continue;
+                        }
+
+                        lastDataRows.Enqueue(line);
+                        if (lastDataRows.Count > 10)
+                        {
+                            lastDataRows.Dequeue();
+                        }
+                    }
+                }
+
+                // Overwrite online file with latest snapshot.
+                using var writer = new StreamWriter(targetFile, append: false);
+                writer.WriteLine(header);
+
+                foreach (var row in lastDataRows)
+                {
+                    writer.WriteLine(row);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Błąd zapisu pliku ProcesOnline.csv: {ex.Message}");
+            }
+        }
+
         /// <summary>
         /// Resolves Tuya Pump device id from configuration dictionary.
         /// </summary>
