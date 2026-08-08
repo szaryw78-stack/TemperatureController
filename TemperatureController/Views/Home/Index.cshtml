@@ -175,8 +175,22 @@
             border-radius: 6px;
             padding: 15px;
             box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-            height: 400px;
-            position: relative; /* Ważne dla Chart.js */
+            min-height: 520px; /* zamiast sztywnego height */
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .chart-toolbar {
+            flex: 0 0 auto;
+        }
+
+        .chart-plot {
+            position: relative;
+            flex: 1 1 auto;
+            min-height: 280px;
+            width: 100%;
         }
 
         .d-none { display: none; }
@@ -353,8 +367,12 @@
             }
 
             .chart-container {
-                height: 350px; /* Nieco niższy wykres na telefonie, żeby uniknąć przewijania */
+                min-height: 420px; /* mobilnie */
                 padding: 10px;
+            }
+
+            .chart-plot {
+                min-height: 220px;
             }
 
             .tiles-grid {
@@ -552,7 +570,7 @@
 
         <div class="section-title">Wykres online (SignalR)</div>
         <div class="chart-container">
-            <div style="margin-bottom: 15px;">
+            <div class="chart-toolbar" style="margin-bottom: 15px;">
                 <strong style="display:block; margin-bottom:8px;">Widoczność na wykresie:</strong>
                 <div style="display: flex; gap: 15px; flex-wrap: wrap;">
                     <label style="cursor: pointer; display:flex; align-items:center; gap:5px;">
@@ -589,8 +607,8 @@
                     </button>
                 </div>
             </div>
-            
-            <div style="position: relative; height: calc(100% - 60px); width: 100%;">
+
+            <div class="chart-plot">
                 <canvas id="processChart"></canvas>
             </div>
         </div>
